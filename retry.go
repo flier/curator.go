@@ -65,7 +65,7 @@ func NewRetryOneTime(sleepBetweenRetry time.Duration) *RetryOneTime {
 
 const (
 	MAX_RETRIES_LIMIT               = 29
-	DEFAULT_MAX_SLEEP time.Duration = time.Duration(math.MaxInt64 * int64(time.Second))
+	DEFAULT_MAX_SLEEP time.Duration = time.Duration(math.MaxInt32 * int64(time.Second))
 )
 
 // Retry policy that retries a set number of times with increasing sleep time between retries
