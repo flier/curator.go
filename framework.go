@@ -1,15 +1,14 @@
 package curator
 
 import (
+	"fmt"
+	"sync/atomic"
 	"time"
+
+	"github.com/golang/glog"
 )
 
-type CuratorFrameworkState int
-
-const (
-	DEFAULT_SESSION_TIMEOUT    time.Duration = 60 * time.Second
-	DEFAULT_CONNECTION_TIMEOUT               = 15 * time.Second
-)
+type CuratorFrameworkState int32
 
 const (
 	LATENT  CuratorFrameworkState = iota // CuratorFramework.Start() has not yet been called
@@ -17,14 +16,27 @@ const (
 	STOPPED                              // CuratorFramework.Close() has been called
 )
 
+func (s *CuratorFrameworkState) Change(oldState, newState CuratorFrameworkState) bool {
+	return atomic.CompareAndSwapInt32((*int32)(s), int32(oldState), int32(newState))
+}
+
+func (s *CuratorFrameworkState) Value() CuratorFrameworkState {
+	return CuratorFrameworkState(atomic.LoadInt32((*int32)(s)))
+}
+
+const (
+	DEFAULT_SESSION_TIMEOUT    time.Duration = 60 * time.Second
+	DEFAULT_CONNECTION_TIMEOUT               = 15 * time.Second
+)
+
 // Zookeeper framework-style client
 type CuratorFramework interface {
 	// Start the client.
 	// Most mutator methods will not work until the client is started
-	Start()
+	Start() error
 
 	// Stop the client
-	Close()
+	Close() error
 
 	// Returns the state of this instance
 	State() CuratorFrameworkState
@@ -58,6 +70,18 @@ type CuratorFramework interface {
 
 	// Start a transaction builder
 	Transaction() CuratorTransaction
+
+	// Returns the listenable interface for the Connect State
+	ConnectionStateListenable() ConnectionStateListenable
+
+	// Returns the listenable interface for events
+	CuratorListenable() CuratorListenable
+
+	// Returns the listenable interface for unhandled errors
+	UnhandledErrorListenable() UnhandledErrorListenable
+
+	// Return the managed zookeeper client
+	ZookeeperClient() *CuratorZookeeperClient
 }
 
 func Dial(connString string, retryPolicy RetryPolicy) CuratorFramework {
@@ -146,7 +170,7 @@ func (b *curatorFrameworkBuilder) Authorizations(authInfos ...AuthInfo) CuratorF
 }
 
 func (b *curatorFrameworkBuilder) ConnectString(connectString string) CuratorFrameworkBuilder {
-	b.ensembleProvider = fixedEnsembleProvider{connectString}
+	b.ensembleProvider = &fixedEnsembleProvider{connectString}
 
 	return b
 }
@@ -212,29 +236,62 @@ func (b *curatorFrameworkBuilder) CanBeReadOnly(canBeReadOnly bool) CuratorFrame
 }
 
 type curatorFramework struct {
-	client *CuratorZookeeperClient
+	client                  *CuratorZookeeperClient
+	stateManager            *ConnectionStateManager
+	state                   CuratorFrameworkState
+	listeners               CuratorListenable
+	unhandledErrorListeners UnhandledErrorListenable
 }
 
 func newCuratorFramework(builder *curatorFrameworkBuilder) *curatorFramework {
-	return &curatorFramework{
-		client: NewClient(),
+	c := &curatorFramework{
+		client:                  NewClient(),
+		listeners:               NewCuratorListenerContainer(),
+		unhandledErrorListeners: NewUnhandledErrorListenerContainer(),
 	}
+
+	c.stateManager = NewConnectionStateManager(c)
+
+	return c
 }
 
-func (c *curatorFramework) Start() {
+func (c *curatorFramework) Start() error {
+	if !c.state.Change(LATENT, STARTED) {
+		return fmt.Errorf("Cannot be started more than once")
+	} else if err := c.stateManager.Start(); err != nil {
+		return err
+	}
 
+	return c.client.Start()
 }
 
-func (c *curatorFramework) Close() {
+func (c *curatorFramework) Close() error {
+	if !c.state.Change(STARTED, STOPPED) {
+		return nil
+	}
 
+	evt := &curatorEvent{eventType: CLOSING}
+
+	c.listeners.ForEach(func(listener CuratorListener) error {
+		return listener.EventReceived(c, evt)
+	})
+
+	c.listeners.Clear()
+	c.unhandledErrorListeners.Clear()
+
+	if err := c.stateManager.Close(); err != nil {
+		glog.Errorf("fail to close state manager, %s", err)
+	}
+
+	return c.client.Close()
 }
 
 func (c *curatorFramework) State() CuratorFrameworkState {
-	return c.state
+	return c.state.Value()
 }
 
 func (c *curatorFramework) Started() bool {
-	return false
+	return c.State() == STARTED
 }
 
 func (c *curatorFramework) Create() CreateBuilder {
@@ -271,4 +328,20 @@ func (c *curatorFramework) SetACL() SetACLBuilder {
 
 func (c *curatorFramework) Transaction() CuratorTransaction {
 	return nil
+}
+
+func (c *curatorFramework) ConnectionStateListenable() ConnectionStateListenable {
+	return c.stateManager.listeners
+}
+
+func (c *curatorFramework) CuratorListenable() CuratorListenable {
+	return c.listeners
+}
+
+func (c *curatorFramework) UnhandledErrorListenable() UnhandledErrorListenable {
+	return c.unhandledErrorListeners
+}
+
+func (c *curatorFramework) ZookeeperClient() *CuratorZookeeperClient {
+	return c.client
 }

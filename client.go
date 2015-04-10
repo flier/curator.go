@@ -5,9 +5,21 @@ import (
 )
 
 type CuratorZookeeperClient struct {
-	state CuratorFrameworkState
+	state ZookeeperConnectionState
 }
 
 func NewClient() *CuratorZookeeperClient {
 	return &CuratorZookeeperClient{}
+}
+
+func (c *CuratorZookeeperClient) Start() error {
+	return nil
+}
+
+func (c *CuratorZookeeperClient) Close() error {
+	return nil
+}
+
+type ZookeeperConnectionState struct {
+	conn *zk.Conn
 }
