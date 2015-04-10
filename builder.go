@@ -6,7 +6,7 @@ type CreateBuilder interface {
 type DeleteBuilder interface {
 }
 
-type ExistsBuilder interface {
+type CheckExistsBuilder interface {
 }
 
 type GetDataBuilder interface {

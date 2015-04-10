@@ -39,7 +39,7 @@ type CuratorFramework interface {
 	Delete() DeleteBuilder
 
 	// Start an exists builder
-	Exists() ExistsBuilder
+	CheckExists() CheckExistsBuilder
 
 	// Start a get data builder
 	GetData() GetDataBuilder
@@ -132,7 +132,7 @@ type curatorFrameworkBuilder struct {
 }
 
 func (b *curatorFrameworkBuilder) Build() CuratorFramework {
-	return &curatorFramework{}
+	return newCuratorFramework(b)
 }
 
 func (b *curatorFrameworkBuilder) Authorization(scheme string, auth []byte) CuratorFrameworkBuilder {
@@ -212,7 +212,13 @@ func (b *curatorFrameworkBuilder) CanBeReadOnly(canBeReadOnly bool) CuratorFrame
 }
 
 type curatorFramework struct {
-	state CuratorFrameworkState
+	client *CuratorZookeeperClient
+}
+
+func newCuratorFramework(builder *curatorFrameworkBuilder) *curatorFramework {
+	return &curatorFramework{
+		client: NewClient(),
+	}
 }
 
 func (c *curatorFramework) Start() {
@@ -239,7 +245,7 @@ func (c *curatorFramework) Delete() DeleteBuilder {
 	return nil
 }
 
-func (c *curatorFramework) Exists() ExistsBuilder {
+func (c *curatorFramework) CheckExists() CheckExistsBuilder {
 	return nil
 }
 
