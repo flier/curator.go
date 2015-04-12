@@ -3,7 +3,10 @@ package curator
 import (
 	"math"
 	"math/rand"
+	"net"
 	"time"
+
+	"github.com/samuel/go-zookeeper/zk"
 )
 
 // Abstraction for retry policies to sleep
@@ -17,6 +20,66 @@ type RetryPolicy interface {
 	// Called when an operation has failed for some reason.
 	// This method should return true to make another attempt.
 	AllowRetry(retryCount int, elapsedTime time.Duration, sleeper RetrySleeper) bool
+}
+
+type retryLoop struct {
+	done         bool
+	retryCount   int
+	startTime    time.Time
+	retryPolicy  RetryPolicy
+	retrySleeper RetrySleeper
+}
+
+func newRetryLoop(retryPolicy RetryPolicy, retrySleeper RetrySleeper) *retryLoop {
+	return &retryLoop{
+		startTime:    time.Now(),
+		retryPolicy:  retryPolicy,
+		retrySleeper: retrySleeper,
+	}
+}
+
+func (l *retryLoop) SleepFor(d time.Duration) error {
+	time.Sleep(d)
+
+	return nil
+}
+
+// If true is returned, make an attempt at the operation
+func (l *retryLoop) shouldContinue() bool { return !l.done }
+
+// Call this when your operation has successfully completed
+func (l *retryLoop) markComplete() { l.done = true }
+
+// return true if the given Zookeeper result code is retry-able
+func (l *retryLoop) shouldRetry(err error) bool {
+	if err == zk.ErrSessionExpired || err == zk.ErrSessionMoved {
+		return true
+	}
+
+	if netErr, ok := err.(net.Error); ok {
+		return netErr.Timeout() || netErr.Temporary()
+	}
+
+	return false
+}
+
+// creates a retry loop calling the given proc and retrying if needed
+func (l *retryLoop) callWithRetry(client CuratorZookeeperClient, proc func() (interface{}, error)) (interface{}, error) {
+	for l.shouldContinue() {
+		if ret, err := proc(); err != nil {
+			if l.shouldRetry(err) {
+				l.retryCount++
+
+				if !l.retryPolicy.AllowRetry(l.retryCount, time.Now()-l.startTime, l) {
+					return ret, err
+				}
+			}
+		} else {
+			l.markComplete()
+
+			return ret, err
+		}
+	}
 }
 
 type SleepingRetry struct {
