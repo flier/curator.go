@@ -241,6 +241,9 @@ type curatorFramework struct {
 	state                   CuratorFrameworkState
 	listeners               CuratorListenable
 	unhandledErrorListeners UnhandledErrorListenable
+	defaultData             []byte
+	compressionProvider     CompressionProvider
+	aclProvider             ACLProvider
 }
 
 func newCuratorFramework(builder *curatorFrameworkBuilder) *curatorFramework {
@@ -248,6 +251,9 @@ func newCuratorFramework(builder *curatorFrameworkBuilder) *curatorFramework {
 		client:                  NewCuratorZookeeperClient(),
 		listeners:               NewCuratorListenerContainer(),
 		unhandledErrorListeners: NewUnhandledErrorListenerContainer(),
+		defaultData:             builder.defaultData,
+		compressionProvider:     builder.compressionProvider,
+		aclProvider:             builder.aclProvider,
 	}
 
 	c.stateManager = NewConnectionStateManager(c)
@@ -259,10 +265,12 @@ func (c *curatorFramework) Start() error {
 	if !c.state.Change(LATENT, STARTED) {
 		return fmt.Errorf("Cannot be started more than once")
 	} else if err := c.stateManager.Start(); err != nil {
-		return err
+		return fmt.Errorf("fail to start state manager, %s", err)
+	} else if err := c.client.Start(); err != nil {
+		return fmt.Errorf("fail to start client, %s", err)
 	}
 
-	return c.client.Start()
+	return nil
 }
 
 func (c *curatorFramework) Close() error {
@@ -295,7 +303,7 @@ func (c *curatorFramework) Started() bool {
 }
 
 func (c *curatorFramework) Create() CreateBuilder {
-	return nil
+	return &createBuilder{client: c}
 }
 
 func (c *curatorFramework) Delete() DeleteBuilder {
@@ -344,4 +352,12 @@ func (c *curatorFramework) UnhandledErrorListenable() UnhandledErrorListenable {
 
 func (c *curatorFramework) ZookeeperClient() *CuratorZookeeperClient {
 	return c.client
+}
+
+func (c *curatorFramework) fixForNamespace(path string, isSequential bool) string {
+	return path
+}
+
+func (c *curatorFramework) unfixForNamespace(path string) string {
+	return path
 }
