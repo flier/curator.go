@@ -8,7 +8,7 @@ type CuratorZookeeperClient struct {
 	state ZookeeperConnectionState
 }
 
-func NewClient() *CuratorZookeeperClient {
+func NewCuratorZookeeperClient() *CuratorZookeeperClient {
 	return &CuratorZookeeperClient{}
 }
 

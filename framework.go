@@ -84,11 +84,11 @@ type CuratorFramework interface {
 	ZookeeperClient() *CuratorZookeeperClient
 }
 
-func Dial(connString string, retryPolicy RetryPolicy) CuratorFramework {
-	return DialTimeout(connString, DEFAULT_SESSION_TIMEOUT, DEFAULT_CONNECTION_TIMEOUT, retryPolicy)
+func NewClient(connString string, retryPolicy RetryPolicy) CuratorFramework {
+	return NewClientTimeout(connString, DEFAULT_SESSION_TIMEOUT, DEFAULT_CONNECTION_TIMEOUT, retryPolicy)
 }
 
-func DialTimeout(connString string, sessionTimeout, connectionTimeout time.Duration, retryPolicy RetryPolicy) CuratorFramework {
+func NewClientTimeout(connString string, sessionTimeout, connectionTimeout time.Duration, retryPolicy RetryPolicy) CuratorFramework {
 	return Builder().ConnectString(connString).SessionTimeout(sessionTimeout).ConnectionTimeout(connectionTimeout).RetryPolicy(retryPolicy).Build()
 }
 
@@ -245,7 +245,7 @@ type curatorFramework struct {
 
 func newCuratorFramework(builder *curatorFrameworkBuilder) *curatorFramework {
 	c := &curatorFramework{
-		client:                  NewClient(),
+		client:                  NewCuratorZookeeperClient(),
 		listeners:               NewCuratorListenerContainer(),
 		unhandledErrorListeners: NewUnhandledErrorListenerContainer(),
 	}
