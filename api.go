@@ -49,7 +49,9 @@ type Versionable /*[T]*/ interface {
 }
 
 // Called when the async background operation completes
-type BackgroundCallback func(client CuratorFramework, event CuratorEvent) error
+type BackgroundCallback interface {
+	ProcessResult(client CuratorFramework, event CuratorEvent) error
+}
 
 type Backgroundable /*[T]*/ interface {
 	// Perform the action in the background
