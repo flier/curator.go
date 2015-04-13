@@ -28,17 +28,21 @@ type retryLoop struct {
 	startTime    time.Time
 	retryPolicy  RetryPolicy
 	retrySleeper RetrySleeper
+	tracer       TracerDriver
 }
 
-func newRetryLoop(retryPolicy RetryPolicy, retrySleeper RetrySleeper) *retryLoop {
+func newRetryLoop(retryPolicy RetryPolicy, tracer TracerDriver) *retryLoop {
 	return &retryLoop{
-		startTime:    time.Now(),
-		retryPolicy:  retryPolicy,
-		retrySleeper: retrySleeper,
+		startTime:   time.Now(),
+		retryPolicy: retryPolicy,
+		tracer:      tracer,
 	}
 }
 
-func (l *retryLoop) SleepFor(d time.Duration) error {
+type defaultRetrySleeper struct {
+}
+
+func (s *defaultRetrySleeper) SleepFor(d time.Duration) error {
 	time.Sleep(d)
 
 	return nil
@@ -64,22 +68,30 @@ func (l *retryLoop) shouldRetry(err error) bool {
 }
 
 // creates a retry loop calling the given proc and retrying if needed
-func (l *retryLoop) callWithRetry(client CuratorZookeeperClient, proc func() (interface{}, error)) (interface{}, error) {
+func (l *retryLoop) callWithRetry(proc func() (interface{}, error)) (interface{}, error) {
 	for l.shouldContinue() {
-		if ret, err := proc(); err != nil {
-			if l.shouldRetry(err) {
-				l.retryCount++
-
-				if !l.retryPolicy.AllowRetry(l.retryCount, time.Now()-l.startTime, l) {
-					return ret, err
-				}
-			}
-		} else {
+		if ret, err := proc(); err == nil {
 			l.markComplete()
 
 			return ret, err
+		} else {
+			if l.shouldRetry(err) {
+				l.retryCount++
+
+				if sleeper := l.retrySleeper; sleeper == nil {
+					sleeper = &defaultRetrySleeper{}
+				} else if !l.retryPolicy.AllowRetry(l.retryCount, time.Now().Sub(l.startTime), sleeper) {
+					l.tracer.AddCount("retries-disallowed", 1)
+
+					return ret, err
+				} else {
+					l.tracer.AddCount("retries-allowed", 1)
+				}
+			}
 		}
 	}
+
+	return nil, nil
 }
 
 type SleepingRetry struct {
