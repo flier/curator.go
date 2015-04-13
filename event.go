@@ -26,7 +26,7 @@ type CuratorEvent interface {
 	Type() CuratorEventType
 
 	// "rc" from async callbacks
-	ResultCode() int
+	Err() error
 
 	// the path
 	Path() string
@@ -54,7 +54,7 @@ type CuratorEvent interface {
 
 type curatorEvent struct {
 	eventType    CuratorEventType
-	resultCode   int
+	err          error
 	path         string
 	name         string
 	children     []string
@@ -67,7 +67,7 @@ type curatorEvent struct {
 
 func (e *curatorEvent) Type() CuratorEventType { return e.eventType }
 
-func (e *curatorEvent) ResultCode() int { return e.resultCode }
+func (e *curatorEvent) Err() error { return e.err }
 
 func (e *curatorEvent) Path() string { return e.path }
 
