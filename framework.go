@@ -242,18 +242,20 @@ type curatorFramework struct {
 	listeners               CuratorListenable
 	unhandledErrorListeners UnhandledErrorListenable
 	defaultData             []byte
+	retryPolicy             RetryPolicy
 	compressionProvider     CompressionProvider
 	aclProvider             ACLProvider
 }
 
-func newCuratorFramework(builder *curatorFrameworkBuilder) *curatorFramework {
+func newCuratorFramework(b *curatorFrameworkBuilder) *curatorFramework {
 	c := &curatorFramework{
-		client:                  NewCuratorZookeeperClient(),
+		client:                  NewCuratorZookeeperClient(b.ensembleProvider, b.sessionTimeout, b.connectionTimeout, b.retryPolicy, b.canBeReadOnly),
 		listeners:               NewCuratorListenerContainer(),
 		unhandledErrorListeners: NewUnhandledErrorListenerContainer(),
-		defaultData:             builder.defaultData,
-		compressionProvider:     builder.compressionProvider,
-		aclProvider:             builder.aclProvider,
+		defaultData:             b.defaultData,
+		retryPolicy:             b.retryPolicy,
+		compressionProvider:     b.compressionProvider,
+		aclProvider:             b.aclProvider,
 	}
 
 	c.stateManager = NewConnectionStateManager(c)
