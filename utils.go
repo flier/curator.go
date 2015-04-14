@@ -13,7 +13,7 @@ type Closeable interface {
 func CloseQuietly(closeable Closeable) (err error) {
 	defer func() {
 		if v := recover(); v != nil {
-			glog.Fatalf("panic when closing %s, %v", closeable, v)
+			glog.Errorf("panic when closing %s, %v", closeable, v)
 
 			err, _ = v.(error)
 		}
