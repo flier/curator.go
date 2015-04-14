@@ -319,7 +319,7 @@ func (c *curatorFramework) Create() CreateBuilder {
 func (c *curatorFramework) Delete() DeleteBuilder {
 	c.state.Check(STARTED, "instance must be started before calling this method")
 
-	return nil
+	return &checkExistsBuilder{client: c}
 }
 
 func (c *curatorFramework) CheckExists() CheckExistsBuilder {
@@ -386,4 +386,8 @@ func (c *curatorFramework) fixForNamespace(path string, isSequential bool) strin
 
 func (c *curatorFramework) unfixForNamespace(path string) string {
 	return path
+}
+
+func (c *curatorFramework) getNamespaceWatcher(watcher Watcher) Watcher {
+	return watcher
 }
