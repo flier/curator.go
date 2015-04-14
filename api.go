@@ -4,16 +4,16 @@ import (
 	"github.com/samuel/go-zookeeper/zk"
 )
 
-type Pathable interface {
+type Pathable /*[T]*/ interface {
 	// Commit the currently building operation using the given path
-	ForPath(path string) (string, error)
+	ForPath(path string) (interface{} /* T */, error)
 }
 
-type PathAndBytesable interface {
-	Pathable
+type PathAndBytesable /*[T]*/ interface {
+	Pathable /*[T]*/
 
 	// Commit the currently building operation using the given path and data
-	ForPathWithData(path string, payload []byte) (string, error)
+	ForPathWithData(path string, payload []byte) (interface{} /* T */, error)
 }
 
 type Compressible /*[T]*/ interface {
@@ -46,6 +46,18 @@ type ACLable /*[T]*/ interface {
 type Versionable /*[T]*/ interface {
 	// Use the given version (the default is -1)
 	WithVersion(version int) interface{} // T
+}
+
+type Watcher interface {
+	Process(event *zk.Event) error
+}
+
+type Watchable /*[T]*/ interface {
+	// Have the operation set a watch
+	Watched() interface{} // T
+
+	// Set a watcher for the operation
+	UsingWatcher(watcher Watcher) interface{} // T
 }
 
 // Called when the async background operation completes
