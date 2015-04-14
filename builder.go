@@ -119,9 +119,9 @@ func (b *createBuilder) ForPathWithData(givenPath string, payload []byte) (strin
 	adjustedPath := b.client.fixForNamespace(givenPath, b.createMode.IsSequential())
 
 	if b.backgrounding.inBackground {
-		b.pathInBackground(adjustedPath, payload, givenPath)
+		go b.pathInBackground(adjustedPath, payload, givenPath)
 
-		return "", nil
+		return b.client.unfixForNamespace(adjustedPath), nil
 	} else {
 		path, err := b.pathInForeground(adjustedPath, payload)
 
@@ -130,27 +130,29 @@ func (b *createBuilder) ForPathWithData(givenPath string, payload []byte) (strin
 }
 
 func (b *createBuilder) pathInBackground(path string, payload []byte, givenPath string) {
-	go func() {
-		createdPath, err := b.pathInForeground(path, payload)
+	tracer := b.client.ZookeeperClient().startTracer("createBuilder.pathInBackground")
 
-		event := &curatorEvent{
-			eventType: CREATE,
-			err:       err,
-			path:      createdPath,
-			data:      payload,
-			context:   b.backgrounding.context,
-		}
+	defer tracer.Commit()
 
-		if err != nil {
-			event.path = givenPath
-		} else {
-			event.name = GetNodeFromPath(createdPath)
-		}
+	createdPath, err := b.pathInForeground(path, payload)
 
-		if b.backgrounding.callback != nil {
-			b.backgrounding.callback.ProcessResult(b.client, event)
-		}
-	}()
+	event := &curatorEvent{
+		eventType: CREATE,
+		err:       err,
+		path:      createdPath,
+		data:      payload,
+		context:   b.backgrounding.context,
+	}
+
+	if err != nil {
+		event.path = givenPath
+	} else {
+		event.name = GetNodeFromPath(createdPath)
+	}
+
+	if b.backgrounding.callback != nil {
+		b.backgrounding.callback.ProcessResult(b.client, event)
+	}
 }
 
 func (b *createBuilder) pathInForeground(path string, payload []byte) (string, error) {

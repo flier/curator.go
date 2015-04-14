@@ -34,6 +34,10 @@ func (c *CuratorZookeeperClient) newRetryLoop() *retryLoop {
 	return newRetryLoop(c.retryPolicy, c.tracer)
 }
 
+func (c *CuratorZookeeperClient) startTracer(name string) Tracer {
+	return newTimeTrace(name, c.tracer)
+}
+
 func (c *CuratorZookeeperClient) Conn() *zk.Conn {
 	return c.state.conn
 }
