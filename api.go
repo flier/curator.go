@@ -48,10 +48,6 @@ type Versionable /*[T]*/ interface {
 	WithVersion(version int) interface{} // T
 }
 
-type Watcher interface {
-	Process(event *zk.Event) error
-}
-
 type Watchable /*[T]*/ interface {
 	// Have the operation set a watch
 	Watched() interface{} // T
@@ -61,9 +57,7 @@ type Watchable /*[T]*/ interface {
 }
 
 // Called when the async background operation completes
-type BackgroundCallback interface {
-	ProcessResult(client CuratorFramework, event CuratorEvent) error
-}
+type BackgroundCallback func(client CuratorFramework, event CuratorEvent) error
 
 type Backgroundable /*[T]*/ interface {
 	// Perform the action in the background
