@@ -17,18 +17,6 @@ func (s *MockRetrySleeper) SleepFor(time time.Duration) error {
 	return s.Called(time).Error(0)
 }
 
-type MockTracerDriver struct {
-	mock.Mock
-}
-
-func (d *MockTracerDriver) AddTime(name string, t time.Duration) {
-	d.Called(name, t)
-}
-
-func (d *MockTracerDriver) AddCount(name string, increment int) {
-	d.Called(name, increment)
-}
-
 func TestRetryLoop(t *testing.T) {
 	d := 3 * time.Second
 	p := NewRetryNTimes(3, d)

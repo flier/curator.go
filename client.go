@@ -76,7 +76,7 @@ func (c *CuratorZookeeperClient) newRetryLoop() *retryLoop {
 }
 
 func (c *CuratorZookeeperClient) startTracer(name string) Tracer {
-	return newTimeTrace(name, c.TracerDriver)
+	return newTimeTracer(name, c.TracerDriver)
 }
 
 func (c *CuratorZookeeperClient) Conn() (*zk.Conn, error) {

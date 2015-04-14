@@ -3,8 +3,6 @@ package curator
 import (
 	"sync"
 	"time"
-
-	"github.com/golang/glog"
 )
 
 // Mechanism for timing methods and recording counters
@@ -23,6 +21,7 @@ type Tracer interface {
 type defaultTracerDriver struct {
 	TracerDriver
 
+	logger   func(fmt string, args ...interface{})
 	lock     sync.Mutex
 	counters map[string]int
 }
@@ -32,8 +31,8 @@ func newDefaultTracerDriver() *defaultTracerDriver {
 }
 
 func (d *defaultTracerDriver) AddTime(name string, time time.Duration) {
-	if glog.V(3) {
-		glog.V(3).Infof("Trace: %s - %s", name, time)
+	if d.logger != nil {
+		d.logger("Trace %s: %s", name, time)
 	}
 }
 
@@ -48,21 +47,21 @@ func (d *defaultTracerDriver) AddCount(name string, increment int) {
 
 	d.lock.Unlock()
 
-	if glog.V(3) {
-		glog.V(3).Infof("Counter %s: %d %d", name, value, increment)
+	if d.logger != nil {
+		d.logger("Counter %s: %d + %d", name, value-increment, increment)
 	}
 }
 
 // Utility to time a method or portion of code
-type timeTrace struct {
+type timeTracer struct {
 	name      string
 	driver    TracerDriver
 	startTime time.Time
 }
 
 // Create and start a timer
-func newTimeTrace(name string, driver TracerDriver) *timeTrace {
-	return &timeTrace{
+func newTimeTracer(name string, driver TracerDriver) *timeTracer {
+	return &timeTracer{
 		name:      name,
 		driver:    driver,
 		startTime: time.Now(),
@@ -70,6 +69,11 @@ func newTimeTrace(name string, driver TracerDriver) *timeTrace {
 }
 
 // Record the elapsed time
-func (t *timeTrace) Commit() {
-	t.driver.AddTime(t.name, time.Now().Sub(t.startTime))
+func (t *timeTracer) Commit() {
+	t.CommitAt(time.Now())
+}
+
+// Record the elapsed time
+func (t *timeTracer) CommitAt(tm time.Time) {
+	t.driver.AddTime(t.name, tm.Sub(t.startTime))
 }
