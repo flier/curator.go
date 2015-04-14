@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/samuel/go-zookeeper/zk"
 )
 
 type CuratorFrameworkState int32
@@ -149,6 +150,7 @@ func Builder() CuratorFrameworkBuilder {
 
 type curatorFrameworkBuilder struct {
 	authInfos           []AuthInfo
+	zookeeperDialer     ZookeeperDialer
 	ensembleProvider    EnsembleProvider
 	defaultData         []byte
 	namespace           string
@@ -163,6 +165,12 @@ type curatorFrameworkBuilder struct {
 
 func (b *curatorFrameworkBuilder) Build() CuratorFramework {
 	return newCuratorFramework(b)
+}
+
+func (b *curatorFrameworkBuilder) WithDial(zookeeperDialer ZookeeperDialer) CuratorFrameworkBuilder {
+	b.zookeeperDialer = zookeeperDialer
+
+	return b
 }
 
 func (b *curatorFrameworkBuilder) Authorization(scheme string, auth []byte) CuratorFrameworkBuilder {
@@ -255,7 +263,6 @@ type curatorFramework struct {
 
 func newCuratorFramework(b *curatorFrameworkBuilder) *curatorFramework {
 	c := &curatorFramework{
-		client:                  NewCuratorZookeeperClient(b.ensembleProvider, b.sessionTimeout, b.connectionTimeout, b.retryPolicy, b.canBeReadOnly),
 		listeners:               NewCuratorListenerContainer(),
 		unhandledErrorListeners: NewUnhandledErrorListenerContainer(),
 		defaultData:             b.defaultData,
@@ -264,6 +271,16 @@ func newCuratorFramework(b *curatorFrameworkBuilder) *curatorFramework {
 		aclProvider:             b.aclProvider,
 	}
 
+	watcher := func(event *zk.Event) {
+		c.processEvent(&curatorEvent{
+			eventType:    WATCHED,
+			err:          event.Err,
+			path:         c.unfixForNamespace(event.Path),
+			watchedEvent: event,
+		})
+	}
+
+	c.client = NewCuratorZookeeperClient(b.zookeeperDialer, b.ensembleProvider, b.sessionTimeout, b.connectionTimeout, watcher, b.retryPolicy, b.canBeReadOnly)
 	c.stateManager = NewConnectionStateManager(c)
 
 	return c
@@ -378,6 +395,13 @@ func (c *curatorFramework) UnhandledErrorListenable() UnhandledErrorListenable {
 
 func (c *curatorFramework) ZookeeperClient() *CuratorZookeeperClient {
 	return c.client
+}
+
+func (c *curatorFramework) processEvent(event CuratorEvent) {
+	if event.Type() == WATCHED {
+
+	}
+
 }
 
 func (c *curatorFramework) fixForNamespace(path string, isSequential bool) string {
