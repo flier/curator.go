@@ -24,6 +24,12 @@ func (s *CuratorFrameworkState) Value() CuratorFrameworkState {
 	return CuratorFrameworkState(atomic.LoadInt32((*int32)(s)))
 }
 
+func (s CuratorFrameworkState) Check(state CuratorFrameworkState, msg string) {
+	if s != state {
+		panic(msg)
+	}
+}
+
 const (
 	DEFAULT_SESSION_TIMEOUT    time.Duration = 60 * time.Second
 	DEFAULT_CONNECTION_TIMEOUT               = 15 * time.Second
@@ -69,7 +75,7 @@ type CuratorFramework interface {
 	SetACL() SetACLBuilder
 
 	// Start a transaction builder
-	Transaction() CuratorTransaction
+	InTransaction() CuratorTransaction
 
 	// Returns the listenable interface for the Connect State
 	ConnectionStateListenable() ConnectionStateListenable
@@ -305,38 +311,56 @@ func (c *curatorFramework) Started() bool {
 }
 
 func (c *curatorFramework) Create() CreateBuilder {
+	c.state.Check(STARTED, "instance must be started before calling this method")
+
 	return &createBuilder{client: c}
 }
 
 func (c *curatorFramework) Delete() DeleteBuilder {
+	c.state.Check(STARTED, "instance must be started before calling this method")
+
 	return nil
 }
 
 func (c *curatorFramework) CheckExists() CheckExistsBuilder {
+	c.state.Check(STARTED, "instance must be started before calling this method")
+
 	return nil
 }
 
 func (c *curatorFramework) GetData() GetDataBuilder {
+	c.state.Check(STARTED, "instance must be started before calling this method")
+
 	return nil
 }
 
 func (c *curatorFramework) SetData() SetDataBuilder {
+	c.state.Check(STARTED, "instance must be started before calling this method")
+
 	return nil
 }
 
 func (c *curatorFramework) GetChildren() GetChildrenBuilder {
+	c.state.Check(STARTED, "instance must be started before calling this method")
+
 	return nil
 }
 
 func (c *curatorFramework) GetACL() GetACLBuilder {
+	c.state.Check(STARTED, "instance must be started before calling this method")
+
 	return nil
 }
 
 func (c *curatorFramework) SetACL() SetACLBuilder {
+	c.state.Check(STARTED, "instance must be started before calling this method")
+
 	return nil
 }
 
-func (c *curatorFramework) Transaction() CuratorTransaction {
+func (c *curatorFramework) InTransaction() CuratorTransaction {
+	c.state.Check(STARTED, "instance must be started before calling this method")
+
 	return nil
 }
 
