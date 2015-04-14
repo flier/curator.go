@@ -106,11 +106,11 @@ func (c *CuratorZookeeperClient) internalBlockUntilConnectedOrTimedOut() error {
 	timer := time.NewTimer(c.connectionTimeout)
 	connected := make(chan error)
 
-	watcher := c.state.addParentWatcher(func(*zk.Event) {
+	watcher := c.state.addParentWatcher(NewWatcher(func(*zk.Event) {
 		if c.state.isConnected() {
 			connected <- nil
 		}
-	})
+	}))
 
 	defer c.state.removeParentWatcher(watcher)
 

@@ -271,14 +271,14 @@ func newCuratorFramework(b *curatorFrameworkBuilder) *curatorFramework {
 		aclProvider:             b.aclProvider,
 	}
 
-	watcher := func(event *zk.Event) {
+	watcher := NewWatcher(func(event *zk.Event) {
 		c.processEvent(&curatorEvent{
 			eventType:    WATCHED,
 			err:          event.Err,
 			path:         c.unfixForNamespace(event.Path),
 			watchedEvent: event,
 		})
-	}
+	})
 
 	c.client = NewCuratorZookeeperClient(b.zookeeperDialer, b.ensembleProvider, b.sessionTimeout, b.connectionTimeout, watcher, b.retryPolicy, b.canBeReadOnly)
 	c.stateManager = NewConnectionStateManager(c)

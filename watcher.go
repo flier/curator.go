@@ -6,7 +6,21 @@ import (
 	"github.com/samuel/go-zookeeper/zk"
 )
 
-type Watcher func(event *zk.Event)
+type Watcher interface {
+	process(event *zk.Event)
+}
+
+type simpleWatcher struct {
+	Func func(event *zk.Event)
+}
+
+func NewWatcher(fn func(event *zk.Event)) *simpleWatcher {
+	return &simpleWatcher{fn}
+}
+
+func (w *simpleWatcher) process(event *zk.Event) {
+	w.Func(event)
+}
 
 type Watchers struct {
 	lock     sync.Mutex
@@ -19,9 +33,10 @@ func NewWatchers(watchers ...Watcher) *Watchers {
 
 func (w *Watchers) Add(watcher Watcher) Watcher {
 	w.lock.Lock()
-	defer w.lock.Unlock()
 
 	w.watchers = append(w.watchers, watcher)
+
+	w.lock.Unlock()
 
 	return watcher
 }
@@ -31,8 +46,10 @@ func (w *Watchers) Remove(watcher Watcher) Watcher {
 	defer w.lock.Unlock()
 
 	for i, v := range w.watchers {
-		if &v == &watcher {
+		if v == watcher {
 			copy(w.watchers[i:], w.watchers[i+1:])
+
+			w.watchers = w.watchers[:len(w.watchers)-1]
 
 			return watcher
 		}
@@ -46,8 +63,12 @@ func (w *Watchers) Watch(events <-chan zk.Event) {
 		if event, ok := <-events; !ok {
 			break
 		} else {
-			for _, watcher := range w.watchers {
-				go watcher(&event)
+			w.lock.Lock()
+			watchers := w.watchers
+			w.lock.Unlock()
+
+			for _, watcher := range watchers {
+				go watcher.process(&event)
 			}
 		}
 	}
