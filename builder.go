@@ -181,7 +181,7 @@ func (b *createBuilder) pathInBackground(path string, payload []byte, givenPath 
 	}
 
 	if b.backgrounding.callback != nil {
-		b.backgrounding.callback.ProcessResult(b.client, event)
+		b.backgrounding.callback(b.client, event)
 	} else if glog.V(3) {
 		glog.V(3).Infof("ignore CREATE event: %s", event)
 	}
@@ -190,16 +190,20 @@ func (b *createBuilder) pathInBackground(path string, payload []byte, givenPath 
 func (b *createBuilder) pathInForeground(path string, payload []byte) (string, error) {
 	zkClient := b.client.ZookeeperClient()
 
-	result, err := zkClient.newRetryLoop().callWithRetry(func() (result interface{}, err error) {
-		result, err = zkClient.Conn().Create(path, payload, int32(b.createMode), b.acling.aclList)
+	result, err := zkClient.newRetryLoop().callWithRetry(func() (interface{}, error) {
+		if conn, err := zkClient.Conn(); err != nil {
+			return nil, err
+		} else {
+			result, err := conn.Create(path, payload, int32(b.createMode), b.acling.aclList)
 
-		if err == zk.ErrNoNode && b.createParentsIfNeeded {
-			MakeDirs(zkClient.Conn(), path, false, b.acling.aclProvider)
+			if err == zk.ErrNoNode && b.createParentsIfNeeded {
+				MakeDirs(conn, path, false, b.acling.aclProvider)
 
-			result, err = zkClient.Conn().Create(path, payload, int32(b.createMode), b.acling.aclList)
+				return conn.Create(path, payload, int32(b.createMode), b.acling.aclList)
+			} else {
+				return result, err
+			}
 		}
-
-		return
 	})
 
 	if err != nil {
@@ -293,7 +297,7 @@ func (b *checkExistsBuilder) pathInBackground(path string) {
 	}
 
 	if b.backgrounding.callback != nil {
-		b.backgrounding.callback.ProcessResult(b.client, event)
+		b.backgrounding.callback(b.client, event)
 	} else if glog.V(3) {
 		glog.V(3).Infof("ignore EXISTS event: %s", event)
 	}
@@ -303,23 +307,31 @@ func (b *checkExistsBuilder) pathInForeground(path string) (*zk.Stat, error) {
 	zkClient := b.client.ZookeeperClient()
 
 	result, err := zkClient.newRetryLoop().callWithRetry(func() (interface{}, error) {
-		var exists bool
-		var stat *zk.Stat
-		var events <-chan zk.Event
-		var err error
-
-		if b.watching.watched || b.watching.watcher != nil {
-			exists, stat, events, err = zkClient.Conn().ExistsW(path)
-		} else {
-			exists, stat, err = zkClient.Conn().Exists(path)
-		}
-
-		if err != nil {
+		if conn, err := zkClient.Conn(); err != nil {
 			return nil, err
-		} else if !exists {
-			return stat, zk.ErrNoNode
 		} else {
-			return stat, nil
+			var exists bool
+			var stat *zk.Stat
+			var events <-chan zk.Event
+			var err error
+
+			if b.watching.watched || b.watching.watcher != nil {
+				exists, stat, events, err = conn.ExistsW(path)
+
+				if b.watching.watcher != nil {
+					NewWatchers(b.watching.watcher).Watch(events)
+				}
+			} else {
+				exists, stat, err = conn.Exists(path)
+			}
+
+			if err != nil {
+				return nil, err
+			} else if !exists {
+				return stat, zk.ErrNoNode
+			} else {
+				return stat, nil
+			}
 		}
 	})
 
