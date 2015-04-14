@@ -8,6 +8,15 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+func TestGetNodeFromPath(t *testing.T) {
+	assert.Equal(t, "child", GetNodeFromPath("child"))
+
+	assert.Equal(t, "", GetNodeFromPath("/child/"))
+
+	assert.Equal(t, "child", GetNodeFromPath("/child"))
+	assert.Equal(t, "child", GetNodeFromPath("/parent/child"))
+}
+
 func TestSplitPath(t *testing.T) {
 	p, err := SplitPath("test")
 

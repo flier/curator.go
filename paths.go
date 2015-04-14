@@ -18,6 +18,16 @@ type PathAndNode struct {
 	Path, Node string
 }
 
+func GetNodeFromPath(path string) string {
+	if idx := strings.LastIndex(path, PATH_SEPARATOR); idx < 0 {
+		return path
+	} else if idx+1 >= len(path) {
+		return ""
+	} else {
+		return path[idx+1:]
+	}
+}
+
 func SplitPath(path string) (*PathAndNode, error) {
 	if idx := strings.LastIndex(path, PATH_SEPARATOR); idx < 0 {
 		return &PathAndNode{path, ""}, nil
