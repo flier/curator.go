@@ -1,6 +1,8 @@
 package curator
 
 import (
+	"fmt"
+
 	"github.com/samuel/go-zookeeper/zk"
 )
 
@@ -127,26 +129,52 @@ func (b *createBuilder) ForPathWithData(givenPath string, payload []byte) (strin
 	}
 }
 
-func (b *createBuilder) pathInBackground(adjustedPath string, payload []byte, givenPath string) {
+func (b *createBuilder) pathInBackground(path string, payload []byte, givenPath string) {
+	go func() {
+		createdPath, err := b.pathInForeground(path, payload)
 
+		event := &curatorEvent{
+			eventType: CREATE,
+			err:       err,
+			path:      createdPath,
+			data:      payload,
+			context:   b.backgrounding.context,
+		}
+
+		if err != nil {
+			event.path = givenPath
+		} else {
+			event.name = GetNodeFromPath(createdPath)
+		}
+
+		if b.backgrounding.callback != nil {
+			b.backgrounding.callback.ProcessResult(b.client, event)
+		}
+	}()
 }
 
 func (b *createBuilder) pathInForeground(path string, payload []byte) (string, error) {
 	zkClient := b.client.ZookeeperClient()
 
 	result, err := zkClient.newRetryLoop().callWithRetry(func() (result interface{}, err error) {
-		result, err = zkClient.Zookeeper().Create(path, payload, int32(b.createMode), b.acling.aclList)
+		result, err = zkClient.Conn().Create(path, payload, int32(b.createMode), b.acling.aclList)
 
 		if err == zk.ErrNoNode && b.createParentsIfNeeded {
-			MakeDirs(zkClient.Zookeeper(), path, false, b.acling.aclProvider)
+			MakeDirs(zkClient.Conn(), path, false, b.acling.aclProvider)
 
-			result, err = zkClient.Zookeeper().Create(path, payload, int32(b.createMode), b.acling.aclList)
+			result, err = zkClient.Conn().Create(path, payload, int32(b.createMode), b.acling.aclList)
 		}
 
 		return
 	})
 
-	return result.(string), err
+	if err != nil {
+		return "", err
+	} else if createdPath, ok := result.(string); !ok {
+		return "", fmt.Errorf("fail to convert result to string, %s", result)
+	} else {
+		return createdPath, nil
+	}
 }
 
 func (b *createBuilder) CreatingParentsIfNeeded() CreateBuilder {

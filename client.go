@@ -34,7 +34,7 @@ func (c *CuratorZookeeperClient) newRetryLoop() *retryLoop {
 	return newRetryLoop(c.retryPolicy, c.tracer)
 }
 
-func (c *CuratorZookeeperClient) Zookeeper() *zk.Conn {
+func (c *CuratorZookeeperClient) Conn() *zk.Conn {
 	return c.state.conn
 }
 
