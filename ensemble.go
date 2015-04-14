@@ -1,10 +1,13 @@
 package curator
 
 type EnsembleProvider interface {
+	// Curator will call this method when CuratorZookeeperClient.Start() is called
 	Start() error
 
+	// Curator will call this method when CuratorZookeeperClient.Close() is called
 	Close() error
 
+	// Return the current connection string to use
 	ConnectionString() string
 }
 
