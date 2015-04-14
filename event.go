@@ -7,16 +7,16 @@ import (
 type CuratorEventType int
 
 const (
-	CREATE   CuratorEventType = iota // Corresponds to CuratorFramework.Create()
-	DELETE                           // Corresponds to CuratorFramework.Delete()
-	EXISTS                           // Corresponds to CuratorFramework.CheckExists()
-	GET_DATA                         // Corresponds to CuratorFramework.GetData()
-	SET_DATA                         // Corresponds to CuratorFramework.SetData()
-	CHILDREN                         // Corresponds to CuratorFramework.GetChildren()
-	SYNC                             // Corresponds to CuratorFramework.Sync()
-	GET_ACL                          // Corresponds to CuratorFramework.GetACL()
-	SET_ACL                          // Corresponds to CuratorFramework.SetACL()
-	WATCHED                          // Corresponds to Watchable.UsingWatcher()
+	CREATE   CuratorEventType = iota // CuratorFramework.Create() -> Err(), Path(), Data()
+	DELETE                           // CuratorFramework.Delete() -> Err(), Path()
+	EXISTS                           // CuratorFramework.CheckExists() -> Err(), Path(), Stat()
+	GET_DATA                         // CuratorFramework.GetData() -> Err(), Path(), Stat(), Data()
+	SET_DATA                         // CuratorFramework.SetData() -> Err(), Path(), Stat()
+	CHILDREN                         // CuratorFramework.GetChildren() -> Err(), Path(), Stat(), Children()
+	SYNC                             // CuratorFramework.Sync() -> Err(), Path()
+	GET_ACL                          // CuratorFramework.GetACL() -> Err(), Path()
+	SET_ACL                          // CuratorFramework.SetACL() -> Err(), Path()
+	WATCHED                          // Watchable.UsingWatcher() -> WatchedEvent()
 	CLOSING                          // Event sent when client is being closed
 )
 
