@@ -190,7 +190,7 @@ func (b *createBuilder) pathInBackground(path string, payload []byte, givenPath 
 func (b *createBuilder) pathInForeground(path string, payload []byte) (string, error) {
 	zkClient := b.client.ZookeeperClient()
 
-	result, err := zkClient.newRetryLoop().callWithRetry(func() (interface{}, error) {
+	result, err := zkClient.newRetryLoop().CallWithRetry(func() (interface{}, error) {
 		if conn, err := zkClient.Conn(); err != nil {
 			return nil, err
 		} else {
@@ -306,7 +306,7 @@ func (b *checkExistsBuilder) pathInBackground(path string) {
 func (b *checkExistsBuilder) pathInForeground(path string) (*zk.Stat, error) {
 	zkClient := b.client.ZookeeperClient()
 
-	result, err := zkClient.newRetryLoop().callWithRetry(func() (interface{}, error) {
+	result, err := zkClient.newRetryLoop().CallWithRetry(func() (interface{}, error) {
 		if conn, err := zkClient.Conn(); err != nil {
 			return nil, err
 		} else {

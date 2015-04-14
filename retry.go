@@ -22,6 +22,15 @@ type RetryPolicy interface {
 	AllowRetry(retryCount int, elapsedTime time.Duration, sleeper RetrySleeper) bool
 }
 
+type defaultRetrySleeper struct {
+}
+
+func (s *defaultRetrySleeper) SleepFor(d time.Duration) error {
+	time.Sleep(d)
+
+	return nil
+}
+
 type retryLoop struct {
 	done         bool
 	retryCount   int
@@ -39,21 +48,6 @@ func newRetryLoop(retryPolicy RetryPolicy, tracer TracerDriver) *retryLoop {
 	}
 }
 
-type defaultRetrySleeper struct {
-}
-
-func (s *defaultRetrySleeper) SleepFor(d time.Duration) error {
-	time.Sleep(d)
-
-	return nil
-}
-
-// If true is returned, make an attempt at the operation
-func (l *retryLoop) shouldContinue() bool { return !l.done }
-
-// Call this when your operation has successfully completed
-func (l *retryLoop) markComplete() { l.done = true }
-
 // return true if the given Zookeeper result code is retry-able
 func (l *retryLoop) shouldRetry(err error) bool {
 	if err == zk.ErrSessionExpired || err == zk.ErrSessionMoved {
@@ -68,19 +62,17 @@ func (l *retryLoop) shouldRetry(err error) bool {
 }
 
 // creates a retry loop calling the given proc and retrying if needed
-func (l *retryLoop) callWithRetry(proc func() (interface{}, error)) (interface{}, error) {
-	for l.shouldContinue() {
-		if ret, err := proc(); err == nil {
-			l.markComplete()
-
+func (l *retryLoop) CallWithRetry(proc func() (interface{}, error)) (interface{}, error) {
+	for {
+		if ret, err := proc(); err == nil || !l.shouldRetry(err) {
 			return ret, err
 		} else {
-			if l.shouldRetry(err) {
-				l.retryCount++
+			l.retryCount++
 
-				if sleeper := l.retrySleeper; sleeper == nil {
-					sleeper = &defaultRetrySleeper{}
-				} else if !l.retryPolicy.AllowRetry(l.retryCount, time.Now().Sub(l.startTime), sleeper) {
+			if sleeper := l.retrySleeper; sleeper == nil {
+				sleeper = &defaultRetrySleeper{}
+			} else {
+				if !l.retryPolicy.AllowRetry(l.retryCount, time.Now().Sub(l.startTime), sleeper) {
 					l.tracer.AddCount("retries-disallowed", 1)
 
 					return ret, err

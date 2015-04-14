@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/samuel/go-zookeeper/zk"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -14,6 +15,56 @@ type MockRetrySleeper struct {
 
 func (s *MockRetrySleeper) SleepFor(time time.Duration) error {
 	return s.Called(time).Error(0)
+}
+
+type MockTracerDriver struct {
+	mock.Mock
+}
+
+func (d *MockTracerDriver) AddTime(name string, t time.Duration) {
+	d.Called(name, t)
+}
+
+func (d *MockTracerDriver) AddCount(name string, increment int) {
+	d.Called(name, increment)
+}
+
+func TestRetryLoop(t *testing.T) {
+	d := 3 * time.Second
+	p := NewRetryNTimes(3, d)
+	sleeper := &MockRetrySleeper{}
+	tracer := &MockTracerDriver{}
+
+	retryLoop := newRetryLoop(p, tracer)
+
+	assert.NotNil(t, retryLoop)
+	assert.Equal(t, 0, retryLoop.retryCount)
+
+	retryLoop.retrySleeper = sleeper
+
+	errors := []error{zk.ErrSessionExpired, zk.ErrSessionMoved, nil}
+
+	sleeper.On("SleepFor", d).Return(nil).Times(2)
+	tracer.On("AddCount", "retries-allowed", 1).Return().Twice()
+
+	_, err := retryLoop.CallWithRetry(func() (interface{}, error) {
+		return nil, errors[retryLoop.retryCount]
+	})
+
+	assert.NoError(t, err)
+	assert.Equal(t, 2, retryLoop.retryCount)
+
+	sleeper.AssertExpectations(t)
+	tracer.AssertExpectations(t)
+
+	// retry loop failed
+	retryLoop = newRetryLoop(p, nil)
+
+	_, err = retryLoop.CallWithRetry(func() (interface{}, error) {
+		return nil, zk.ErrClosing
+	})
+
+	assert.EqualError(t, err, zk.ErrClosing.Error())
 }
 
 func TestRetryNTimes(t *testing.T) {
