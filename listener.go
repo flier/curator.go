@@ -3,6 +3,7 @@ package curator
 import (
 	"fmt"
 	"reflect"
+	"sync"
 )
 
 type ConnectionStateListener interface {
@@ -21,8 +22,50 @@ type UnhandledErrorListener interface {
 	UnhandledError(err error)
 }
 
+type connectionStateListenerCallback func(client CuratorFramework, newState ConnectionState)
+
+type connectionStateListenerStub struct {
+	callback connectionStateListenerCallback
+}
+
+func NewConnectionStateListener(callback connectionStateListenerCallback) ConnectionStateListener {
+	return &connectionStateListenerStub{callback}
+}
+
+func (l *connectionStateListenerStub) StateChanged(client CuratorFramework, newState ConnectionState) {
+	l.callback(client, newState)
+}
+
+type curatorListenerCallback func(client CuratorFramework, event CuratorEvent) error
+
+type curatorListenerStub struct {
+	callback curatorListenerCallback
+}
+
+func NewCuratorListener(callback curatorListenerCallback) CuratorListener {
+	return &curatorListenerStub{callback}
+}
+
+func (l *curatorListenerStub) EventReceived(client CuratorFramework, event CuratorEvent) error {
+	return l.callback(client, event)
+}
+
+type unhandledErrorListenerCallback func(err error)
+
+type unhandledErrorListenerStub struct {
+	callback unhandledErrorListenerCallback
+}
+
+func NewUnhandledErrorListener(callback unhandledErrorListenerCallback) UnhandledErrorListener {
+	return &unhandledErrorListenerStub{callback}
+}
+
+func (l *unhandledErrorListenerStub) UnhandledError(err error) {
+	l.callback(err)
+}
+
 // Abstracts a listenable object
-type Listenable interface {
+type Listenable /* [T] */ interface {
 	// Add the given listener.
 	AddListener(listener interface{}, executor Executor)
 
@@ -37,7 +80,7 @@ type Listenable interface {
 }
 
 type ConnectionStateListenable interface {
-	Listenable
+	Listenable /* [T] */
 
 	Add(listener ConnectionStateListener)
 
@@ -45,7 +88,7 @@ type ConnectionStateListenable interface {
 }
 
 type CuratorListenable interface {
-	Listenable
+	Listenable /* [T] */
 
 	Add(listener CuratorListener)
 
@@ -53,44 +96,57 @@ type CuratorListenable interface {
 }
 
 type UnhandledErrorListenable interface {
-	Listenable
+	Listenable /* [T] */
 
 	Add(listener UnhandledErrorListener)
 
 	Remove(listener UnhandledErrorListener)
 }
 
-type ListenerContainer struct {
+type listenerContainer struct {
+	lock      sync.Mutex
 	listeners map[interface{}]Executor
 }
 
-func NewListenerContainer() *ListenerContainer {
-	return &ListenerContainer{
+func newListenerContainer() *listenerContainer {
+	return &listenerContainer{
 		listeners: make(map[interface{}]Executor),
 	}
 }
 
-func (c *ListenerContainer) AddListener(listener interface{}, executor Executor) {
+func (c *listenerContainer) AddListener(listener interface{}, executor Executor) {
+	c.lock.Lock()
+
 	c.listeners[listener] = executor
+
+	c.lock.Unlock()
 }
 
-func (c *ListenerContainer) RemoveListener(listener interface{}) {
+func (c *listenerContainer) RemoveListener(listener interface{}) {
+	c.lock.Lock()
+
 	delete(c.listeners, listener)
+
+	c.lock.Unlock()
 }
 
-func (c *ListenerContainer) Len() int {
+func (c *listenerContainer) Len() int {
 	return len(c.listeners)
 }
 
-func (c *ListenerContainer) Clear() {
+func (c *listenerContainer) Clear() {
+	c.lock.Lock()
+
 	c.listeners = make(map[interface{}]Executor)
+
+	c.lock.Unlock()
 }
 
-func (c *ListenerContainer) Execute(command Runnable) error {
+func (c *listenerContainer) Execute(command Runnable) error {
 	return command()
 }
 
-func (c *ListenerContainer) ForEach(fn interface{}, args ...interface{}) error {
+func (c *listenerContainer) ForEach(fn interface{}, args ...interface{}) error {
 	v := reflect.ValueOf(fn)
 
 	if v.Kind() != reflect.Func {
@@ -126,50 +182,50 @@ func (c *ListenerContainer) ForEach(fn interface{}, args ...interface{}) error {
 	return nil
 }
 
-type ConnectionStateListenerContainer struct {
-	*ListenerContainer
+type connectionStateListenerContainer struct {
+	*listenerContainer
 }
 
-func NewConnectionStateListenerContainer() *ConnectionStateListenerContainer {
-	return &ConnectionStateListenerContainer{NewListenerContainer()}
+func NewConnectionStateListenerContainer() *connectionStateListenerContainer {
+	return &connectionStateListenerContainer{newListenerContainer()}
 }
 
-func (c *ConnectionStateListenerContainer) Add(listener ConnectionStateListener) {
+func (c *connectionStateListenerContainer) Add(listener ConnectionStateListener) {
 	c.AddListener(listener, nil)
 }
 
-func (c *ConnectionStateListenerContainer) Remove(listener ConnectionStateListener) {
+func (c *connectionStateListenerContainer) Remove(listener ConnectionStateListener) {
 	c.RemoveListener(listener)
 }
 
-type CuratorListenerContainer struct {
-	*ListenerContainer
+type curatorListenerContainer struct {
+	*listenerContainer
 }
 
-func NewCuratorListenerContainer() *CuratorListenerContainer {
-	return &CuratorListenerContainer{NewListenerContainer()}
+func NewCuratorListenerContainer() *curatorListenerContainer {
+	return &curatorListenerContainer{newListenerContainer()}
 }
 
-func (c *CuratorListenerContainer) Add(listener CuratorListener) {
+func (c *curatorListenerContainer) Add(listener CuratorListener) {
 	c.AddListener(listener, nil)
 }
 
-func (c *CuratorListenerContainer) Remove(listener CuratorListener) {
+func (c *curatorListenerContainer) Remove(listener CuratorListener) {
 	c.RemoveListener(listener)
 }
 
-type UnhandledErrorListenerContainer struct {
-	*ListenerContainer
+type unhandledErrorListenerContainer struct {
+	*listenerContainer
 }
 
-func NewUnhandledErrorListenerContainer() *UnhandledErrorListenerContainer {
-	return &UnhandledErrorListenerContainer{NewListenerContainer()}
+func NewUnhandledErrorListenerContainer() *unhandledErrorListenerContainer {
+	return &unhandledErrorListenerContainer{newListenerContainer()}
 }
 
-func (c *UnhandledErrorListenerContainer) Add(listener UnhandledErrorListener) {
+func (c *unhandledErrorListenerContainer) Add(listener UnhandledErrorListener) {
 	c.AddListener(listener, nil)
 }
 
-func (c *UnhandledErrorListenerContainer) Remove(listener UnhandledErrorListener) {
+func (c *unhandledErrorListenerContainer) Remove(listener UnhandledErrorListener) {
 	c.RemoveListener(listener)
 }
