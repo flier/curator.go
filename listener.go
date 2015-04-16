@@ -60,6 +60,48 @@ type UnhandledErrorListenable interface {
 	Remove(listener UnhandledErrorListener)
 }
 
+type connectionStateListenerCallback func(client CuratorFramework, newState ConnectionState)
+
+type connectionStateListenerStub struct {
+	callback connectionStateListenerCallback
+}
+
+func NewConnectionStateListener(callback connectionStateListenerCallback) ConnectionStateListener {
+	return &connectionStateListenerStub{callback}
+}
+
+func (l *connectionStateListenerStub) StateChanged(client CuratorFramework, newState ConnectionState) {
+	l.callback(client, newState)
+}
+
+type curatorListenerCallback func(client CuratorFramework, event CuratorEvent) error
+
+type curatorListenerStub struct {
+	callback curatorListenerCallback
+}
+
+func NewCuratorListener(callback curatorListenerCallback) CuratorListener {
+	return &curatorListenerStub{callback}
+}
+
+func (l *curatorListenerStub) EventReceived(client CuratorFramework, event CuratorEvent) error {
+	return l.callback(client, event)
+}
+
+type unhandledErrorListenerCallback func(err error)
+
+type unhandledErrorListenerStub struct {
+	callback unhandledErrorListenerCallback
+}
+
+func NewUnhandledErrorListener(callback unhandledErrorListenerCallback) UnhandledErrorListener {
+	return &unhandledErrorListenerStub{callback}
+}
+
+func (l *unhandledErrorListenerStub) UnhandledError(err error) {
+	l.callback(err)
+}
+
 type ListenerContainer struct {
 	listeners map[interface{}]Executor
 }
