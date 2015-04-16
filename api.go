@@ -55,7 +55,22 @@ type Versionable /*[T]*/ interface {
 
 type Statable /*[T]*/ interface {
 	// Have the operation fill the provided stat object
-	StoringStatIn(*zk.Stat) interface{}
+	StoringStatIn(*zk.Stat) interface{} // T
+}
+
+type ParentsCreatable /*[T]*/ interface {
+	// Causes any parent nodes to get created if they haven't already been
+	CreatingParentsIfNeeded() interface{} // T
+}
+
+type ChildrenDeletable /*[T]*/ interface {
+	// Will also delete children if they exist.
+	DeletingChildrenIfNeeded() interface{} // T
+}
+
+type Guaranteeable /*[T]*/ interface {
+	// Solves this edge case: deleting a node can fail due to connection issues.
+	Guaranteed() interface{} // T
 }
 
 type Watchable /*[T]*/ interface {

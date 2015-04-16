@@ -226,13 +226,13 @@ func (c *curatorFramework) Create() CreateBuilder {
 func (c *curatorFramework) Delete() DeleteBuilder {
 	c.state.Check(STARTED, "instance must be started before calling this method")
 
-	return &checkExistsBuilder{client: c}
+	return &deleteBuilder{client: c, version: -1}
 }
 
 func (c *curatorFramework) CheckExists() CheckExistsBuilder {
 	c.state.Check(STARTED, "instance must be started before calling this method")
 
-	return nil
+	return &checkExistsBuilder{client: c}
 }
 
 func (c *curatorFramework) GetData() GetDataBuilder {

@@ -5,7 +5,7 @@ import (
 )
 
 type CreateBuilder interface {
-	// PathAndBytesable
+	// PathAndBytesable[T]
 	//
 	// Commit the currently building operation using the given path
 	ForPath(path string) (string, error)
@@ -13,6 +13,8 @@ type CreateBuilder interface {
 	// Commit the currently building operation using the given path and data
 	ForPathWithData(path string, payload []byte) (string, error)
 
+	// ParentsCreatable[T]
+	//
 	// Causes any parent nodes to get created if they haven't already been
 	CreatingParentsIfNeeded() CreateBuilder
 
@@ -76,10 +78,43 @@ type CheckExistsBuilder interface {
 }
 
 type DeleteBuilder interface {
+	// Pathable[T]
+	//
+	// Commit the currently building operation using the given path
+	ForPath(path string) error
+
+	// ChildrenDeletable[T]
+	//
+	// Will also delete children if they exist.
+	DeletingChildrenIfNeeded() DeleteBuilder
+
+	// Guaranteeable[T]
+	//
+	// Solves this edge case: deleting a node can fail due to connection issues.
+	Guaranteed() DeleteBuilder
+
+	// Versionable[T]
+	//
+	// Use the given version (the default is -1)
+	WithVersion(version int) DeleteBuilder
+
+	// Backgroundable[T]
+	//
+	// Perform the action in the background
+	InBackground() DeleteBuilder
+
+	// Perform the action in the background
+	InBackgroundWithContext(context interface{}) DeleteBuilder
+
+	// Perform the action in the background
+	InBackgroundWithCallback(callback BackgroundCallback) DeleteBuilder
+
+	// Perform the action in the background
+	InBackgroundWithCallbackAndContext(callback BackgroundCallback, context interface{}) DeleteBuilder
 }
 
 type GetDataBuilder interface {
-	// Pathable
+	// Pathable[T]
 	//
 	// Commit the currently building operation using the given path
 	ForPath(path string) ([]byte, error)
@@ -118,7 +153,7 @@ type GetDataBuilder interface {
 }
 
 type SetDataBuilder interface {
-	// PathAndBytesable
+	// PathAndBytesable[T]
 	//
 	// Commit the currently building operation using the given path
 	ForPath(path string) (*zk.Stat, error)
