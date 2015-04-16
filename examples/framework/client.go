@@ -13,10 +13,18 @@ func CreateSimple(connString string) curator.CuratorFramework {
 	// the third will wait up to 4 seconds.
 	retryPolicy := curator.NewExponentialBackoffRetry(time.Second, 3, 15*time.Second)
 
+	// The simplest way to get a CuratorFramework instance. This will use default values.
+	// The only required arguments are the connection string and the retry policy
 	return curator.NewClient(connString, retryPolicy)
 }
 
-func createWithOptions(connString string, retryPolicy curator.RetryPolicy, connectionTimeout, sessionTimeout time.Duration) curator.CuratorFramework {
-	// using the CuratorFrameworkBuilder/Builder() gives fine grained control
-	return curator.Builder().ConnectString(connString).RetryPolicy(retryPolicy).ConnectionTimeout(connectionTimeout).SessionTimeout(sessionTimeout).Build()
+func CreateWithOptions(connString string, retryPolicy curator.RetryPolicy, connectionTimeout, sessionTimeout time.Duration) curator.CuratorFramework {
+	// using the CuratorFrameworkBuilder gives fine grained control over creation options.
+	builder := &curator.CuratorFrameworkBuilder{
+		ConnectionTimeout: connectionTimeout,
+		SessionTimeout:    sessionTimeout,
+		RetryPolicy:       retryPolicy,
+	}
+
+	return builder.ConnectString(connString).Authorization("digest", []byte("user:pass")).Build()
 }
