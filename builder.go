@@ -88,11 +88,6 @@ type DeleteBuilder interface {
 	// Will also delete children if they exist.
 	DeletingChildrenIfNeeded() DeleteBuilder
 
-	// Guaranteeable[T]
-	//
-	// Solves this edge case: deleting a node can fail due to connection issues.
-	Guaranteed() DeleteBuilder
-
 	// Versionable[T]
 	//
 	// Use the given version (the default is -1)

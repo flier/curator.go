@@ -49,7 +49,7 @@ func newRetryLoop(retryPolicy RetryPolicy, tracer TracerDriver) *retryLoop {
 }
 
 // return true if the given Zookeeper result code is retry-able
-func (l *retryLoop) shouldRetry(err error) bool {
+func (l *retryLoop) ShouldRetry(err error) bool {
 	if err == zk.ErrSessionExpired || err == zk.ErrSessionMoved {
 		return true
 	}
@@ -64,7 +64,7 @@ func (l *retryLoop) shouldRetry(err error) bool {
 // creates a retry loop calling the given proc and retrying if needed
 func (l *retryLoop) CallWithRetry(proc func() (interface{}, error)) (interface{}, error) {
 	for {
-		if ret, err := proc(); err == nil || !l.shouldRetry(err) {
+		if ret, err := proc(); err == nil || !l.ShouldRetry(err) {
 			return ret, err
 		} else {
 			l.retryCount++

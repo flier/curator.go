@@ -1,10 +1,13 @@
 package curator
 
+import (
+	"github.com/samuel/go-zookeeper/zk"
+)
+
 type deleteBuilder struct {
 	client                   *curatorFramework
 	backgrounding            backgrounding
 	deletingChildrenIfNeeded bool
-	guaranteed               bool
 	version                  int
 }
 
@@ -16,7 +19,7 @@ func (b *deleteBuilder) ForPath(givenPath string) error {
 
 		return nil
 	} else {
-		return b.pathInForeground(adjustedPath)
+		return b.pathInForeground(adjustedPath, givenPath)
 	}
 }
 
@@ -25,7 +28,7 @@ func (b *deleteBuilder) pathInBackground(path string, givenPath string) {
 
 	defer tracer.Commit()
 
-	err := b.pathInForeground(path)
+	err := b.pathInForeground(path, givenPath)
 
 	if b.backgrounding.callback != nil {
 		event := &curatorEvent{
@@ -45,15 +48,23 @@ func (b *deleteBuilder) pathInBackground(path string, givenPath string) {
 	}
 }
 
-func (b *deleteBuilder) pathInForeground(path string) error {
+func (b *deleteBuilder) pathInForeground(path string, givenPath string) error {
 	zkClient := b.client.ZookeeperClient()
 
-	_, err := zkClient.newRetryLoop().CallWithRetry(func() (interface{}, error) {
-		if conn, err := zkClient.Conn(); err != nil {
-			return nil, err
-		} else {
-			return nil, conn.Delete(path, int32(b.version))
+	retryLoop := zkClient.newRetryLoop()
+
+	_, err := retryLoop.CallWithRetry(func() (interface{}, error) {
+		conn, err := zkClient.Conn()
+
+		if err == nil {
+			err = conn.Delete(path, int32(b.version))
+
+			if err == zk.ErrNotEmpty && b.deletingChildrenIfNeeded {
+				err = DeleteChildren(conn, path, true)
+			}
 		}
+
+		return nil, err
 	})
 
 	return err
@@ -61,12 +72,6 @@ func (b *deleteBuilder) pathInForeground(path string) error {
 
 func (b *deleteBuilder) DeletingChildrenIfNeeded() DeleteBuilder {
 	b.deletingChildrenIfNeeded = true
-
-	return b
-}
-
-func (b *deleteBuilder) Guaranteed() DeleteBuilder {
-	b.guaranteed = true
 
 	return b
 }

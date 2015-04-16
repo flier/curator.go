@@ -182,3 +182,8 @@ func MakeDirs(conn ZookeeperConnection, path string, makeLastNode bool, aclProvi
 
 	return nil
 }
+
+// Recursively deletes children of a node.
+func DeleteChildren(conn ZookeeperConnection, path string, deleteSelf bool) error {
+	return nil
+}

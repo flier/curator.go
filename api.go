@@ -68,11 +68,6 @@ type ChildrenDeletable /*[T]*/ interface {
 	DeletingChildrenIfNeeded() interface{} // T
 }
 
-type Guaranteeable /*[T]*/ interface {
-	// Solves this edge case: deleting a node can fail due to connection issues.
-	Guaranteed() interface{} // T
-}
-
 type Watchable /*[T]*/ interface {
 	// Have the operation set a watch
 	Watched() interface{} // T

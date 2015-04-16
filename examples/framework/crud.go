@@ -24,7 +24,7 @@ func CheckExists(client curator.CuratorFramework, path string) (*zk.Stat, error)
 }
 
 func Delete(client curator.CuratorFramework, path string, version int) error {
-	return client.Delete().DeletingChildrenIfNeeded().Guaranteed().WithVersion(version).ForPath(path)
+	return client.Delete().DeletingChildrenIfNeeded().WithVersion(version).ForPath(path)
 }
 
 func GetData(client curator.CuratorFramework, path string) ([]byte, error) {
