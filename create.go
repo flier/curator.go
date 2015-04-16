@@ -1,8 +1,6 @@
 package curator
 
 import (
-	"fmt"
-
 	"github.com/samuel/go-zookeeper/zk"
 )
 
@@ -74,25 +72,21 @@ func (b *createBuilder) pathInForeground(path string, payload []byte) (string, e
 		if conn, err := zkClient.Conn(); err != nil {
 			return nil, err
 		} else {
-			result, err := conn.Create(path, payload, int32(b.createMode), b.acling.aclList)
+			createdPath, err := conn.Create(path, payload, int32(b.createMode), b.acling.aclList)
 
 			if err == zk.ErrNoNode && b.createParentsIfNeeded {
 				MakeDirs(conn, path, false, b.acling.aclProvider)
 
 				return conn.Create(path, payload, int32(b.createMode), b.acling.aclList)
 			} else {
-				return result, err
+				return createdPath, err
 			}
 		}
 	})
 
-	if err != nil {
-		return "", err
-	} else if createdPath, ok := result.(string); !ok {
-		return "", fmt.Errorf("fail to convert result to string, %s", result)
-	} else {
-		return createdPath, nil
-	}
+	createdPath, _ := result.(string)
+
+	return createdPath, err
 }
 
 func (b *createBuilder) CreatingParentsIfNeeded() CreateBuilder {

@@ -187,6 +187,37 @@ type SetDataBuilder interface {
 }
 
 type GetChildrenBuilder interface {
+	// Pathable[T]
+	//
+	// Commit the currently building operation using the given path
+	ForPath(path string) ([]string, error)
+
+	// Statable[T]
+	//
+	// Have the operation fill the provided stat object
+	StoringStatIn(stat *zk.Stat) GetChildrenBuilder
+
+	// Watchable[T]
+	//
+	// Have the operation set a watch
+	Watched() GetChildrenBuilder
+
+	// Set a watcher for the operation
+	UsingWatcher(watcher Watcher) GetChildrenBuilder
+
+	// Backgroundable[T]
+	//
+	// Perform the action in the background
+	InBackground() GetChildrenBuilder
+
+	// Perform the action in the background
+	InBackgroundWithContext(context interface{}) GetChildrenBuilder
+
+	// Perform the action in the background
+	InBackgroundWithCallback(callback BackgroundCallback) GetChildrenBuilder
+
+	// Perform the action in the background
+	InBackgroundWithCallbackAndContext(callback BackgroundCallback, context interface{}) GetChildrenBuilder
 }
 
 type GetACLBuilder interface {

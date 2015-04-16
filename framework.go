@@ -250,7 +250,7 @@ func (c *curatorFramework) SetData() SetDataBuilder {
 func (c *curatorFramework) GetChildren() GetChildrenBuilder {
 	c.state.Check(STARTED, "instance must be started before calling this method")
 
-	return nil
+	return &childrenBuilder{client: c}
 }
 
 func (c *curatorFramework) GetACL() GetACLBuilder {
