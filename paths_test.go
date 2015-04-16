@@ -86,7 +86,24 @@ func (c *MockConn) Create(path string, data []byte, flags int32, acl []zk.ACL) (
 func (c *MockConn) Exists(path string) (bool, *zk.Stat, error) {
 	args := c.Called(path)
 
-	return args.Bool(0), nil, args.Error(2)
+	stat, _ := args.Get(1).(*zk.Stat)
+
+	return args.Bool(0), stat, args.Error(2)
+}
+
+func (c *MockConn) Children(path string) ([]string, *zk.Stat, error) {
+	args := c.Called(path)
+
+	children, _ := args.Get(0).([]string)
+	stat, _ := args.Get(1).(*zk.Stat)
+
+	return children, stat, args.Error(2)
+}
+
+func (c *MockConn) Delete(path string, version int32) error {
+	args := c.Called(path, version)
+
+	return args.Error(0)
 }
 
 type MockACLProvider struct {
@@ -155,4 +172,28 @@ func TestMakeDirs(t *testing.T) {
 
 	conn.AssertExpectations(t)
 	acls.AssertExpectations(t)
+}
+
+func TestDeleteChildren(t *testing.T) {
+	// Delete children
+	conn := &MockConn{}
+
+	conn.On("Children", "/parent").Return([]string{"child1", "child2"}, nil, nil).Once()
+	conn.On("Children", "/parent/child1").Return(nil, nil, nil).Once()
+	conn.On("Children", "/parent/child2").Return(nil, nil, nil).Once()
+	conn.On("Delete", "/parent/child1", -1).Return(nil).Once()
+	conn.On("Delete", "/parent/child2", -1).Return(zk.ErrNoNode).Once()
+
+	assert.NoError(t, DeleteChildren(conn, "/parent", false))
+
+	conn.AssertExpectations(t)
+
+	// Children failed
+	conn = &MockConn{}
+
+	conn.On("Children", "/parent").Return(nil, nil, zk.ErrNoNode).Once()
+
+	assert.Equal(t, DeleteChildren(conn, "/parent", false), zk.ErrNoNode)
+
+	conn.AssertExpectations(t)
 }

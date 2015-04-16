@@ -136,6 +136,10 @@ type ZookeeperConnection interface {
 	Create(path string, data []byte, flags int32, acl []zk.ACL) (string, error)
 
 	Exists(path string) (bool, *zk.Stat, error)
+
+	Children(path string) ([]string, *zk.Stat, error)
+
+	Delete(path string, version int32) error
 }
 
 // Make sure all the nodes in the path are created
@@ -185,5 +189,32 @@ func MakeDirs(conn ZookeeperConnection, path string, makeLastNode bool, aclProvi
 
 // Recursively deletes children of a node.
 func DeleteChildren(conn ZookeeperConnection, path string, deleteSelf bool) error {
+	if err := ValidatePath(path); err != nil {
+		return err
+	}
+
+	if children, _, err := conn.Children(path); err != nil {
+		return err
+	} else {
+		for _, child := range children {
+			if err := DeleteChildren(conn, JoinPath(path, child), true); err != nil {
+				return err
+			}
+		}
+	}
+
+	if deleteSelf {
+		if err := conn.Delete(path, -1); err != nil {
+			switch err {
+			case zk.ErrNotEmpty:
+				return DeleteChildren(conn, path, true)
+			case zk.ErrNoNode:
+				return nil
+			default:
+				return err
+			}
+		}
+	}
+
 	return nil
 }
