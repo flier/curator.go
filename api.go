@@ -21,6 +21,11 @@ type Compressible /*[T]*/ interface {
 	Compressed() interface{} // T
 }
 
+type Decompressible /*[T]*/ interface {
+	// Cause the data to be de-compressed using the configured compression provider
+	Decompressed() interface{} // T
+}
+
 type CreateMode int32
 
 const (
@@ -46,6 +51,11 @@ type ACLable /*[T]*/ interface {
 type Versionable /*[T]*/ interface {
 	// Use the given version (the default is -1)
 	WithVersion(version int) interface{} // T
+}
+
+type Statable /*[T]*/ interface {
+	// Have the operation fill the provided stat object
+	StoringStatIn(*zk.Stat) interface{}
 }
 
 type Watchable /*[T]*/ interface {

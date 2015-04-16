@@ -238,7 +238,7 @@ func (c *curatorFramework) CheckExists() CheckExistsBuilder {
 func (c *curatorFramework) GetData() GetDataBuilder {
 	c.state.Check(STARTED, "instance must be started before calling this method")
 
-	return nil
+	return &getDataBuilder{client: c}
 }
 
 func (c *curatorFramework) SetData() SetDataBuilder {

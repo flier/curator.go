@@ -1,7 +1,6 @@
 package curator
 
 import (
-	"github.com/golang/glog"
 	"github.com/samuel/go-zookeeper/zk"
 )
 
@@ -30,18 +29,17 @@ func (b *checkExistsBuilder) pathInBackground(path string) {
 
 	stat, err := b.pathInForeground(path)
 
-	event := &curatorEvent{
-		eventType: EXISTS,
-		err:       err,
-		path:      b.client.unfixForNamespace(path),
-		stat:      stat,
-		context:   b.backgrounding.context,
-	}
-
 	if b.backgrounding.callback != nil {
+		event := &curatorEvent{
+			eventType: EXISTS,
+			err:       err,
+			path:      b.client.unfixForNamespace(path),
+			stat:      stat,
+			name:      GetNodeFromPath(path),
+			context:   b.backgrounding.context,
+		}
+
 		b.backgrounding.callback(b.client, event)
-	} else if glog.V(3) {
-		glog.V(3).Infof("ignore EXISTS event: %s", event)
 	}
 }
 
@@ -60,7 +58,7 @@ func (b *checkExistsBuilder) pathInForeground(path string) (*zk.Stat, error) {
 			if b.watching.watched || b.watching.watcher != nil {
 				exists, stat, events, err = conn.ExistsW(path)
 
-				if b.watching.watcher != nil {
+				if events != nil && b.watching.watcher != nil {
 					NewWatchers(b.watching.watcher).Watch(events)
 				}
 			} else {

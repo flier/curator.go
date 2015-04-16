@@ -3,7 +3,6 @@ package curator
 import (
 	"fmt"
 
-	"github.com/golang/glog"
 	"github.com/samuel/go-zookeeper/zk"
 )
 
@@ -49,24 +48,22 @@ func (b *createBuilder) pathInBackground(path string, payload []byte, givenPath 
 
 	createdPath, err := b.pathInForeground(path, payload)
 
-	event := &curatorEvent{
-		eventType: CREATE,
-		err:       err,
-		path:      createdPath,
-		data:      payload,
-		context:   b.backgrounding.context,
-	}
-
-	if err != nil {
-		event.path = givenPath
-	} else {
-		event.name = GetNodeFromPath(createdPath)
-	}
-
 	if b.backgrounding.callback != nil {
+		event := &curatorEvent{
+			eventType: CREATE,
+			err:       err,
+			path:      createdPath,
+			data:      payload,
+			context:   b.backgrounding.context,
+		}
+
+		if err != nil {
+			event.path = givenPath
+		}
+
+		event.name = GetNodeFromPath(createdPath)
+
 		b.backgrounding.callback(b.client, event)
-	} else if glog.V(3) {
-		glog.V(3).Infof("ignore CREATE event: %s", event)
 	}
 }
 

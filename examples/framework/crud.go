@@ -15,9 +15,27 @@ func CreateEphemeral(client curator.CuratorFramework, path string, payload []byt
 	return client.Create().WithMode(curator.EPHEMERAL).ForPathWithData(path, payload)
 }
 
+func CheckExists(client curator.CuratorFramework, path string) (*zk.Stat, error) {
+	watcher := curator.NewWatcher(func(event *zk.Event) {
+		// examine event for details
+	})
+
+	return client.CheckExists().UsingWatcher(watcher).ForPath(path)
+}
+
+func GetData(client curator.CuratorFramework, path string) ([]byte, error) {
+	var stat zk.Stat
+
+	watcher := curator.NewWatcher(func(event *zk.Event) {
+		// examine event for details
+	})
+
+	return client.GetData().StoringStatIn(&stat).Decompressed().UsingWatcher(watcher).ForPath(path)
+}
+
 func SetData(client curator.CuratorFramework, path string, payload []byte) (*zk.Stat, error) {
 	// set data for the given node
-	return client.SetData().ForPathWithData(path, payload)
+	return client.SetData().Compressed().ForPathWithData(path, payload)
 }
 
 func SetDataAsync(client curator.CuratorFramework, path string, payload []byte) (*zk.Stat, error) {

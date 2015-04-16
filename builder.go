@@ -79,6 +79,42 @@ type DeleteBuilder interface {
 }
 
 type GetDataBuilder interface {
+	// Pathable
+	//
+	// Commit the currently building operation using the given path
+	ForPath(path string) ([]byte, error)
+
+	// Decompressible[T]
+	//
+	// Cause the data to be de-compressed using the configured compression provider
+	Decompressed() GetDataBuilder
+
+	// Statable[T]
+	//
+	// Have the operation fill the provided stat object
+	StoringStatIn(stat *zk.Stat) GetDataBuilder
+
+	// Watchable[T]
+	//
+	// Have the operation set a watch
+	Watched() GetDataBuilder
+
+	// Set a watcher for the operation
+	UsingWatcher(watcher Watcher) GetDataBuilder
+
+	// Backgroundable[T]
+	//
+	// Perform the action in the background
+	InBackground() GetDataBuilder
+
+	// Perform the action in the background
+	InBackgroundWithContext(context interface{}) GetDataBuilder
+
+	// Perform the action in the background
+	InBackgroundWithCallback(callback BackgroundCallback) GetDataBuilder
+
+	// Perform the action in the background
+	InBackgroundWithCallbackAndContext(callback BackgroundCallback, context interface{}) GetDataBuilder
 }
 
 type SetDataBuilder interface {

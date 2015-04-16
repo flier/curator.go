@@ -1,9 +1,147 @@
 package curator
 
 import (
-	"github.com/golang/glog"
 	"github.com/samuel/go-zookeeper/zk"
 )
+
+type getDataBuilder struct {
+	client        *curatorFramework
+	backgrounding backgrounding
+	decompress    bool
+	stat          *zk.Stat
+	watching      watching
+}
+
+func (b *getDataBuilder) ForPath(givenPath string) ([]byte, error) {
+	adjustedPath := b.client.fixForNamespace(givenPath, false)
+
+	if b.backgrounding.inBackground {
+		go b.pathInBackground(adjustedPath, givenPath)
+
+		return nil, nil
+	}
+
+	if payload, err := b.pathInForeground(adjustedPath); err != nil {
+		return nil, err
+	} else if b.decompress {
+		if data, err := b.client.compressionProvider.Decompress(givenPath, payload); err != nil {
+			return nil, err
+		} else {
+			return data, nil
+		}
+	} else {
+		return payload, err
+	}
+}
+
+func (b *getDataBuilder) pathInBackground(adjustedPath, givenPath string) {
+	tracer := b.client.ZookeeperClient().startTracer("getDataBuilder.pathInBackground")
+
+	defer tracer.Commit()
+
+	data, err := b.pathInForeground(adjustedPath)
+
+	if b.backgrounding.callback != nil {
+		event := &curatorEvent{
+			eventType: GET_DATA,
+			err:       err,
+			path:      b.client.unfixForNamespace(adjustedPath),
+			data:      data,
+			context:   b.backgrounding.context,
+		}
+
+		if err != nil {
+			event.path = givenPath
+		}
+
+		event.name = GetNodeFromPath(event.path)
+
+		b.backgrounding.callback(b.client, event)
+	}
+}
+
+func (b *getDataBuilder) pathInForeground(path string) ([]byte, error) {
+	zkClient := b.client.ZookeeperClient()
+
+	result, err := zkClient.newRetryLoop().CallWithRetry(func() (interface{}, error) {
+		if conn, err := zkClient.Conn(); err != nil {
+			return nil, err
+		} else {
+			var data []byte
+			var stat *zk.Stat
+			var events <-chan zk.Event
+			var err error
+
+			if b.watching.watched || b.watching.watcher != nil {
+				data, stat, events, err = conn.GetW(path)
+
+				if events != nil && b.watching.watcher != nil {
+					NewWatchers(b.watching.watcher).Watch(events)
+				}
+			} else {
+				data, stat, err = conn.Get(path)
+			}
+
+			if stat != nil && b.stat != nil {
+				*b.stat = *stat
+			}
+
+			return data, err
+		}
+	})
+
+	data, _ := result.([]byte)
+
+	return data, err
+}
+
+func (b *getDataBuilder) Decompressed() GetDataBuilder {
+	b.decompress = true
+
+	return b
+}
+
+func (b *getDataBuilder) StoringStatIn(stat *zk.Stat) GetDataBuilder {
+	b.stat = stat
+
+	return b
+}
+
+func (b *getDataBuilder) Watched() GetDataBuilder {
+	b.watching.watched = true
+
+	return b
+}
+
+func (b *getDataBuilder) UsingWatcher(watcher Watcher) GetDataBuilder {
+	b.watching.watcher = b.client.getNamespaceWatcher(watcher)
+
+	return b
+}
+
+func (b *getDataBuilder) InBackground() GetDataBuilder {
+	b.backgrounding = backgrounding{inBackground: true}
+
+	return b
+}
+
+func (b *getDataBuilder) InBackgroundWithContext(context interface{}) GetDataBuilder {
+	b.backgrounding = backgrounding{inBackground: true, context: context}
+
+	return b
+}
+
+func (b *getDataBuilder) InBackgroundWithCallback(callback BackgroundCallback) GetDataBuilder {
+	b.backgrounding = backgrounding{inBackground: true, callback: callback}
+
+	return b
+}
+
+func (b *getDataBuilder) InBackgroundWithCallbackAndContext(callback BackgroundCallback, context interface{}) GetDataBuilder {
+	b.backgrounding = backgrounding{inBackground: true, context: context, callback: callback}
+
+	return b
+}
 
 type setDataBuilder struct {
 	client        *curatorFramework
@@ -43,19 +181,23 @@ func (b *setDataBuilder) pathInBackground(path string, payload []byte, givenPath
 
 	stat, err := b.pathInForeground(path, payload)
 
-	event := &curatorEvent{
-		eventType: SET_DATA,
-		err:       err,
-		path:      b.client.unfixForNamespace(path),
-		data:      payload,
-		stat:      stat,
-		context:   b.backgrounding.context,
-	}
-
 	if b.backgrounding.callback != nil {
+		event := &curatorEvent{
+			eventType: SET_DATA,
+			err:       err,
+			path:      b.client.unfixForNamespace(path),
+			data:      payload,
+			stat:      stat,
+			context:   b.backgrounding.context,
+		}
+
+		if err != nil {
+			event.path = givenPath
+		}
+
+		event.name = GetNodeFromPath(event.path)
+
 		b.backgrounding.callback(b.client, event)
-	} else if glog.V(3) {
-		glog.V(3).Infof("ignore CREATE event: %s", event)
 	}
 }
 
