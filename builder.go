@@ -82,6 +82,37 @@ type GetDataBuilder interface {
 }
 
 type SetDataBuilder interface {
+	// PathAndBytesable
+	//
+	// Commit the currently building operation using the given path
+	ForPath(path string) (*zk.Stat, error)
+
+	// Commit the currently building operation using the given path and data
+	ForPathWithData(path string, payload []byte) (*zk.Stat, error)
+
+	// Versionable[T]
+	//
+	// Use the given version (the default is -1)
+	WithVersion(version int) SetDataBuilder
+
+	// Compressible[T]
+	//
+	// Cause the data to be compressed using the configured compression provider
+	Compressed() SetDataBuilder
+
+	// Backgroundable[T]
+	//
+	// Perform the action in the background
+	InBackground() SetDataBuilder
+
+	// Perform the action in the background
+	InBackgroundWithContext(context interface{}) SetDataBuilder
+
+	// Perform the action in the background
+	InBackgroundWithCallback(callback BackgroundCallback) SetDataBuilder
+
+	// Perform the action in the background
+	InBackgroundWithCallbackAndContext(callback BackgroundCallback, context interface{}) SetDataBuilder
 }
 
 type GetChildrenBuilder interface {

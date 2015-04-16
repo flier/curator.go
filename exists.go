@@ -33,7 +33,7 @@ func (b *checkExistsBuilder) pathInBackground(path string) {
 	event := &curatorEvent{
 		eventType: EXISTS,
 		err:       err,
-		path:      path,
+		path:      b.client.unfixForNamespace(path),
 		stat:      stat,
 		context:   b.backgrounding.context,
 	}
