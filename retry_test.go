@@ -12,8 +12,8 @@ import (
 func TestRetryLoop(t *testing.T) {
 	d := 3 * time.Second
 	p := NewRetryNTimes(3, d)
-	sleeper := &MockRetrySleeper{}
-	tracer := &MockTracerDriver{}
+	sleeper := &mockRetrySleeper{}
+	tracer := &mockTracerDriver{}
 
 	retryLoop := newRetryLoop(p, tracer)
 
@@ -50,7 +50,7 @@ func TestRetryLoop(t *testing.T) {
 func TestRetryNTimes(t *testing.T) {
 	d := 3 * time.Second
 	p := NewRetryNTimes(3, d)
-	s := &MockRetrySleeper{}
+	s := &mockRetrySleeper{}
 
 	assert.NotNil(t, p)
 
@@ -67,7 +67,7 @@ func TestRetryNTimes(t *testing.T) {
 func TestRetryOneTime(t *testing.T) {
 	d := 3 * time.Second
 	p := NewRetryOneTime(d)
-	s := &MockRetrySleeper{}
+	s := &mockRetrySleeper{}
 
 	assert.NotNil(t, p)
 
@@ -82,7 +82,7 @@ func TestRetryOneTime(t *testing.T) {
 func TestExponentialBackoffRetry(t *testing.T) {
 	d := 3 * time.Second
 	p := NewExponentialBackoffRetry(d, 3, 9*time.Second)
-	s := &MockRetrySleeper{}
+	s := &mockRetrySleeper{}
 
 	assert.NotNil(t, p)
 
@@ -103,7 +103,7 @@ func TestExponentialBackoffRetry(t *testing.T) {
 func TestRetryUntilElapsed(t *testing.T) {
 	d := 3 * time.Second
 	p := NewRetryUntilElapsed(3*d, d)
-	s := &MockRetrySleeper{}
+	s := &mockRetrySleeper{}
 
 	assert.NotNil(t, p)
 

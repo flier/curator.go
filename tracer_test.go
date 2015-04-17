@@ -30,7 +30,7 @@ func TestDefaultTracerDriver(t *testing.T) {
 }
 
 func TestTimeTrace(t *testing.T) {
-	d := &MockTracerDriver{}
+	d := &mockTracerDriver{}
 
 	d.On("AddTime", "test", time.Second*5).Return().Once()
 

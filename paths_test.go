@@ -72,7 +72,7 @@ func TestValidatePath(t *testing.T) {
 
 func TestMakeDirs(t *testing.T) {
 	// skip exists `parent` and create `child`
-	conn := &MockConn{}
+	conn := &mockConn{}
 
 	conn.On("Exists", "/parent").Return(true, nil, nil).Once()
 	conn.On("Exists", "/parent/child").Return(false, nil, nil).Once()
@@ -83,7 +83,7 @@ func TestMakeDirs(t *testing.T) {
 	conn.AssertExpectations(t)
 
 	// fail to create `parent`
-	conn = &MockConn{}
+	conn = &mockConn{}
 
 	conn.On("Exists", "/parent").Return(true, nil, zk.ErrAPIError).Once()
 
@@ -92,7 +92,7 @@ func TestMakeDirs(t *testing.T) {
 	conn.AssertExpectations(t)
 
 	// create `child` which exists
-	conn = &MockConn{}
+	conn = &mockConn{}
 
 	conn.On("Exists", "/parent").Return(true, nil, nil).Once()
 	conn.On("Exists", "/parent/child").Return(false, nil, nil).Once()
@@ -103,8 +103,8 @@ func TestMakeDirs(t *testing.T) {
 	conn.AssertExpectations(t)
 
 	// create `child` with default ACLs
-	conn = &MockConn{}
-	acls := &MockACLProvider{}
+	conn = &mockConn{}
+	acls := &mockACLProvider{}
 
 	conn.On("Exists", "/parent").Return(true, nil, nil).Once()
 	conn.On("Exists", "/parent/child").Return(false, nil, nil).Once()
@@ -122,7 +122,7 @@ func TestMakeDirs(t *testing.T) {
 
 func TestDeleteChildren(t *testing.T) {
 	// Delete children
-	conn := &MockConn{}
+	conn := &mockConn{}
 
 	conn.On("Children", "/parent").Return([]string{"child1", "child2"}, nil, nil).Once()
 	conn.On("Children", "/parent/child1").Return(nil, nil, nil).Once()
@@ -135,7 +135,7 @@ func TestDeleteChildren(t *testing.T) {
 	conn.AssertExpectations(t)
 
 	// Children failed
-	conn = &MockConn{}
+	conn = &mockConn{}
 
 	conn.On("Children", "/parent").Return(nil, nil, zk.ErrNoNode).Once()
 

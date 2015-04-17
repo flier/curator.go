@@ -9,7 +9,7 @@ import (
 
 func TestCloseQuietly(t *testing.T) {
 	// No Error
-	c := &MockCloseable{}
+	c := &mockCloseable{}
 
 	c.On("Close").Return(nil).Once()
 
@@ -18,7 +18,7 @@ func TestCloseQuietly(t *testing.T) {
 	c.AssertExpectations(t)
 
 	// Return Error
-	c = &MockCloseable{}
+	c = &mockCloseable{}
 
 	c.On("Close").Return(errors.New("test")).Once()
 
@@ -27,7 +27,7 @@ func TestCloseQuietly(t *testing.T) {
 	c.AssertExpectations(t)
 
 	// Panic
-	c = &MockCloseable{crash: true}
+	c = &mockCloseable{crash: true}
 
 	assert.EqualError(t, CloseQuietly(c), "panic")
 
