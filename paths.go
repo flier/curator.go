@@ -18,6 +18,7 @@ type PathAndNode struct {
 	Path, Node string
 }
 
+// Given a full path, return the node name. i.e. "/one/two/three" will return "three"
 func GetNodeFromPath(path string) string {
 	if idx := strings.LastIndex(path, PATH_SEPARATOR); idx < 0 {
 		return path
@@ -28,6 +29,7 @@ func GetNodeFromPath(path string) string {
 	}
 }
 
+// Given a full path, return the the individual parts, without slashes.
 func SplitPath(path string) (*PathAndNode, error) {
 	if idx := strings.LastIndex(path, PATH_SEPARATOR); idx < 0 {
 		return &PathAndNode{path, ""}, nil
@@ -38,6 +40,7 @@ func SplitPath(path string) (*PathAndNode, error) {
 	}
 }
 
+// Given a parent and a child node, join them in the given path
 func JoinPath(parent string, children ...string) string {
 	path := new(bytes.Buffer)
 

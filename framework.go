@@ -107,10 +107,12 @@ type CuratorFramework interface {
 	ZookeeperClient() *CuratorZookeeperClient
 }
 
+// Create a new client with default session timeout and default connection timeout
 func NewClient(connString string, retryPolicy RetryPolicy) CuratorFramework {
 	return NewClientTimeout(connString, DEFAULT_SESSION_TIMEOUT, DEFAULT_CONNECTION_TIMEOUT, retryPolicy)
 }
 
+// Create a new client
 func NewClientTimeout(connString string, sessionTimeout, connectionTimeout time.Duration, retryPolicy RetryPolicy) CuratorFramework {
 	builder := &CuratorFrameworkBuilder{
 		ConnectionTimeout: connectionTimeout,
@@ -122,18 +124,18 @@ func NewClientTimeout(connString string, sessionTimeout, connectionTimeout time.
 }
 
 type CuratorFrameworkBuilder struct {
-	AuthInfos           []AuthInfo
-	ZookeeperDialer     ZookeeperDialer
-	EnsembleProvider    EnsembleProvider
-	DefaultData         []byte
-	Namespace           string
-	SessionTimeout      time.Duration
-	ConnectionTimeout   time.Duration
-	MaxCloseWait        time.Duration
-	RetryPolicy         RetryPolicy
-	CompressionProvider CompressionProvider
-	AclProvider         ACLProvider
-	CanBeReadOnly       bool
+	AuthInfos           []AuthInfo          // the connection authorization
+	ZookeeperDialer     ZookeeperDialer     // the zookeeper dialer to use
+	EnsembleProvider    EnsembleProvider    // the list ensemble provider.
+	DefaultData         []byte              // the data to use when PathAndBytesable.ForPath(String) is used.
+	Namespace           string              // as ZooKeeper is a shared space, users of a given cluster should stay within a pre-defined namespace
+	SessionTimeout      time.Duration       // the session timeout
+	ConnectionTimeout   time.Duration       // the connection timeout
+	MaxCloseWait        time.Duration       // the time to wait during close to wait background tasks
+	RetryPolicy         RetryPolicy         // the retry policy to use
+	CompressionProvider CompressionProvider // the compression provider
+	AclProvider         ACLProvider         // the provider for ACLs
+	CanBeReadOnly       bool                // allow ZooKeeper client to enter read only mode in case of a network partition.
 }
 
 // Apply the current values and build a new CuratorFramework

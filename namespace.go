@@ -35,6 +35,7 @@ func (f *namespaceFacade) unfixForNamespace(path string) string {
 	return unfixForNamespace(f.namespace, path)
 }
 
+// Apply the namespace to the given path
 func fixForNamespace(namespace, path string, isSequential bool) string {
 	if len(namespace) > 0 {
 		return JoinPath(namespace, path)

@@ -67,16 +67,16 @@ func (l *unhandledErrorListenerStub) UnhandledError(err error) {
 // Abstracts a listenable object
 type Listenable /* [T] */ interface {
 	// Add the given listener.
-	AddListener(listener interface{})
+	AddListener(listener interface{} /* T */)
 
 	// Remove the given listener
-	RemoveListener(listener interface{})
+	RemoveListener(listener interface{} /* T */)
 
 	Len() int
 
 	Clear()
 
-	ForEach(fn interface{}, args ...interface{}) error
+	ForEach(fn interface{}, args ...interface{} /* T */) error
 }
 
 type ConnectionStateListenable interface {
