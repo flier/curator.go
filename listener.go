@@ -67,7 +67,7 @@ func (l *unhandledErrorListenerStub) UnhandledError(err error) {
 // Abstracts a listenable object
 type Listenable /* [T] */ interface {
 	// Add the given listener.
-	AddListener(listener interface{}, executor Executor)
+	AddListener(listener interface{})
 
 	// Remove the given listener
 	RemoveListener(listener interface{})
@@ -105,19 +105,19 @@ type UnhandledErrorListenable interface {
 
 type listenerContainer struct {
 	lock      sync.Mutex
-	listeners map[interface{}]Executor
+	listeners map[interface{}][]reflect.Value
 }
 
 func newListenerContainer() *listenerContainer {
 	return &listenerContainer{
-		listeners: make(map[interface{}]Executor),
+		listeners: make(map[interface{}][]reflect.Value),
 	}
 }
 
-func (c *listenerContainer) AddListener(listener interface{}, executor Executor) {
+func (c *listenerContainer) AddListener(listener interface{}) {
 	c.lock.Lock()
 
-	c.listeners[listener] = executor
+	c.listeners[listener] = nil
 
 	c.lock.Unlock()
 }
@@ -137,13 +137,9 @@ func (c *listenerContainer) Len() int {
 func (c *listenerContainer) Clear() {
 	c.lock.Lock()
 
-	c.listeners = make(map[interface{}]Executor)
+	c.listeners = make(map[interface{}][]reflect.Value)
 
 	c.lock.Unlock()
-}
-
-func (c *listenerContainer) Execute(command Runnable) error {
-	return command()
 }
 
 func (c *listenerContainer) ForEach(fn interface{}, args ...interface{}) error {
@@ -159,24 +155,8 @@ func (c *listenerContainer) ForEach(fn interface{}, args ...interface{}) error {
 		opts = append(opts, reflect.ValueOf(arg))
 	}
 
-	for listener, executor := range c.listeners {
-		if executor == nil {
-			executor = c
-		}
-
-		if err := executor.Execute(func() error {
-			out := v.Call(append([]reflect.Value{reflect.ValueOf(listener)}, opts...))
-
-			if len(out) > 1 {
-				if err, ok := out[0].Interface().(error); ok {
-					return err
-				}
-			}
-
-			return nil
-		}); err != nil {
-			return err
-		}
+	for listener, _ := range c.listeners {
+		c.listeners[listener] = v.Call(append([]reflect.Value{reflect.ValueOf(listener)}, opts...))
 	}
 
 	return nil
@@ -186,12 +166,12 @@ type connectionStateListenerContainer struct {
 	*listenerContainer
 }
 
-func NewConnectionStateListenerContainer() *connectionStateListenerContainer {
+func newConnectionStateListenerContainer() *connectionStateListenerContainer {
 	return &connectionStateListenerContainer{newListenerContainer()}
 }
 
 func (c *connectionStateListenerContainer) Add(listener ConnectionStateListener) {
-	c.AddListener(listener, nil)
+	c.AddListener(listener)
 }
 
 func (c *connectionStateListenerContainer) Remove(listener ConnectionStateListener) {
@@ -202,12 +182,12 @@ type curatorListenerContainer struct {
 	*listenerContainer
 }
 
-func NewCuratorListenerContainer() *curatorListenerContainer {
+func newCuratorListenerContainer() *curatorListenerContainer {
 	return &curatorListenerContainer{newListenerContainer()}
 }
 
 func (c *curatorListenerContainer) Add(listener CuratorListener) {
-	c.AddListener(listener, nil)
+	c.AddListener(listener)
 }
 
 func (c *curatorListenerContainer) Remove(listener CuratorListener) {
@@ -218,12 +198,12 @@ type unhandledErrorListenerContainer struct {
 	*listenerContainer
 }
 
-func NewUnhandledErrorListenerContainer() *unhandledErrorListenerContainer {
+func newUnhandledErrorListenerContainer() *unhandledErrorListenerContainer {
 	return &unhandledErrorListenerContainer{newListenerContainer()}
 }
 
 func (c *unhandledErrorListenerContainer) Add(listener UnhandledErrorListener) {
-	c.AddListener(listener, nil)
+	c.AddListener(listener)
 }
 
 func (c *unhandledErrorListenerContainer) Remove(listener UnhandledErrorListener) {
