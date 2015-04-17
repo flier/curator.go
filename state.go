@@ -33,12 +33,13 @@ type ZookeeperConnectionState struct {
 	connectionTimeout time.Duration
 	tracer            TracerDriver
 	canReadOnly       bool
+	authInfos         []AuthInfo
 	conn              *zk.Conn
 	parentWatchers    Watchers
 }
 
-func newZookeeperConnectionState(zookeeperDialer ZookeeperDialer, ensembleProvider EnsembleProvider,
-	sessionTimeout, connectionTimeout time.Duration, watcher Watcher, tracer TracerDriver, canReadOnly bool) *ZookeeperConnectionState {
+func newZookeeperConnectionState(zookeeperDialer ZookeeperDialer, ensembleProvider EnsembleProvider, sessionTimeout, connectionTimeout time.Duration,
+	watcher Watcher, tracer TracerDriver, canReadOnly bool, authInfos []AuthInfo) *ZookeeperConnectionState {
 
 	s := &ZookeeperConnectionState{
 		zookeeperDialer:   zookeeperDialer,
@@ -47,6 +48,7 @@ func newZookeeperConnectionState(zookeeperDialer ZookeeperDialer, ensembleProvid
 		connectionTimeout: connectionTimeout,
 		tracer:            tracer,
 		canReadOnly:       canReadOnly,
+		authInfos:         authInfos,
 	}
 
 	if zookeeperDialer == nil {
@@ -72,6 +74,14 @@ func (s *ZookeeperConnectionState) Conn() (*zk.Conn, error) {
 	if conn, events, err := s.zookeeperDialer.Dial(s.ensembleProvider.ConnectionString(), s.connectionTimeout, s.canReadOnly); err != nil {
 		return nil, err
 	} else {
+		for _, authInfo := range s.authInfos {
+			if err := conn.AddAuth(authInfo.Scheme, authInfo.Auth); err != nil {
+				conn.Close()
+
+				return nil, err
+			}
+		}
+
 		go s.parentWatchers.Watch(events)
 
 		s.conn = conn

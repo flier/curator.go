@@ -32,7 +32,7 @@ type CuratorZookeeperClient struct {
 }
 
 func NewCuratorZookeeperClient(zookeeperDialer ZookeeperDialer, ensembleProvider EnsembleProvider, sessionTimeout, connectionTimeout time.Duration,
-	watcher Watcher, retryPolicy RetryPolicy, canReadOnly bool) *CuratorZookeeperClient {
+	watcher Watcher, retryPolicy RetryPolicy, canReadOnly bool, authInfos []AuthInfo) *CuratorZookeeperClient {
 
 	if sessionTimeout < connectionTimeout {
 		glog.Warningf("session timeout [%d] is less than connection timeout [%d]", sessionTimeout, connectionTimeout)
@@ -41,7 +41,7 @@ func NewCuratorZookeeperClient(zookeeperDialer ZookeeperDialer, ensembleProvider
 	tracer := newDefaultTracerDriver()
 
 	return &CuratorZookeeperClient{
-		state:             newZookeeperConnectionState(zookeeperDialer, ensembleProvider, sessionTimeout, connectionTimeout, watcher, tracer, canReadOnly),
+		state:             newZookeeperConnectionState(zookeeperDialer, ensembleProvider, sessionTimeout, connectionTimeout, watcher, tracer, canReadOnly, authInfos),
 		connectionTimeout: connectionTimeout,
 		TracerDriver:      tracer,
 		RetryPolicy:       retryPolicy,

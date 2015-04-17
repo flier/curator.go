@@ -141,7 +141,7 @@ func (b *CuratorFrameworkBuilder) ConnectString(connectString string) *CuratorFr
 
 // Add connection authorization
 func (b *CuratorFrameworkBuilder) Authorization(scheme string, auth []byte) *CuratorFrameworkBuilder {
-	b.AuthInfos = append(b.AuthInfos, &authInfo{scheme, auth})
+	b.AuthInfos = append(b.AuthInfos, AuthInfo{scheme, auth})
 
 	return b
 }
@@ -179,7 +179,7 @@ func newCuratorFramework(b *CuratorFrameworkBuilder) *curatorFramework {
 		})
 	})
 
-	c.client = NewCuratorZookeeperClient(b.ZookeeperDialer, b.EnsembleProvider, b.SessionTimeout, b.ConnectionTimeout, watcher, b.RetryPolicy, b.CanBeReadOnly)
+	c.client = NewCuratorZookeeperClient(b.ZookeeperDialer, b.EnsembleProvider, b.SessionTimeout, b.ConnectionTimeout, watcher, b.RetryPolicy, b.CanBeReadOnly, b.AuthInfos)
 	c.stateManager = NewConnectionStateManager(c)
 
 	return c
