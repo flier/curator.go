@@ -273,15 +273,72 @@ type SetACLBuilder interface {
 }
 
 type TransactionCreateBuilder interface {
+	// PathAndBytesable[T]
+	//
+	// Commit the currently building operation using the given path
+	ForPath(path string) TransactionBridge
+
+	// Commit the currently building operation using the given path and data
+	ForPathWithData(path string, payload []byte) TransactionBridge
+
+	// CreateModable[T]
+	//
+	// Set a create mode - the default is CreateMode.PERSISTENT
+	WithMode(mode CreateMode) TransactionCreateBuilder
+
+	// ACLable[T]
+	//
+	// Set an ACL list
+	WithACL(acls ...zk.ACL) TransactionCreateBuilder
+
+	// Compressible[T]
+	//
+	// Cause the data to be compressed using the configured compression provider
+	Compressed() TransactionCreateBuilder
 }
 
 type TransactionDeleteBuilder interface {
+	// Pathable[T]
+	//
+	// Commit the currently building operation using the given path
+	ForPath(path string) TransactionBridge
+
+	// Versionable[T]
+	//
+	// Use the given version (the default is -1)
+	WithVersion(version int) TransactionDeleteBuilder
 }
 
 type TransactionSetDataBuilder interface {
+	// PathAndBytesable[T]
+	//
+	// Commit the currently building operation using the given path
+	ForPath(path string) TransactionBridge
+
+	// Commit the currently building operation using the given path and data
+	ForPathWithData(path string, payload []byte) TransactionBridge
+
+	// Versionable[T]
+	//
+	// Use the given version (the default is -1)
+	WithVersion(version int) TransactionSetDataBuilder
+
+	// Compressible[T]
+	//
+	// Cause the data to be compressed using the configured compression provider
+	Compressed() TransactionSetDataBuilder
 }
 
 type TransactionCheckBuilder interface {
+	// Pathable[T]
+	//
+	// Commit the currently building operation using the given path
+	ForPath(path string) TransactionBridge
+
+	// Versionable[T]
+	//
+	// Use the given version (the default is -1)
+	WithVersion(version int) TransactionCheckBuilder
 }
 
 type acling struct {

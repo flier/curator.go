@@ -76,7 +76,7 @@ type CuratorFramework interface {
 	SetACL() SetACLBuilder
 
 	// Start a transaction builder
-	InTransaction() CuratorTransaction
+	InTransaction() Transaction
 
 	// Returns the listenable interface for the Connect State
 	ConnectionStateListenable() ConnectionStateListenable
@@ -265,10 +265,10 @@ func (c *curatorFramework) SetACL() SetACLBuilder {
 	return &setACLBuilder{client: c, version: -1}
 }
 
-func (c *curatorFramework) InTransaction() CuratorTransaction {
+func (c *curatorFramework) InTransaction() Transaction {
 	c.state.Check(STARTED, "instance must be started before calling this method")
 
-	return nil
+	return &curatorTransaction{client: c}
 }
 
 func (c *curatorFramework) ConnectionStateListenable() ConnectionStateListenable {
