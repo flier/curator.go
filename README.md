@@ -89,11 +89,11 @@ selector.Start()
 # Examples
 This module contains example usages of various Curator features. Each directory in the module is a separate example.
 
-- [/leader](../../tree/master/examples/leader) Example leader selector code 
-- [/cache](../../tree/master/examples/cache) Example PathChildrenCache usage
-- [/locking](../../tree/master/examples/locking) Example of using InterProcessMutex
-- [/discovery](../../tree/master/examples/discovery) Example usage of the Curator's ServiceDiscovery
-- [/framework](../../tree/master/examples/framework) A few examples of how to use the CuratorFramework class
+- [leader](examples/leader) Example leader selector code 
+- [cache](examples/cache) Example PathChildrenCache usage
+- [locking](examples/locking) Example of using InterProcessMutex
+- [discovery](examples/discovery) Example usage of the Curator's ServiceDiscovery
+- [framework](examples/framework) A few examples of how to use the CuratorFramework class
 
 See the [examples](../../tree/master/examples/) source repo for each example.
 
