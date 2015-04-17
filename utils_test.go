@@ -5,22 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 )
-
-type MockCloseable struct {
-	mock.Mock
-
-	crash bool
-}
-
-func (c *MockCloseable) Close() error {
-	if c.crash {
-		panic(errors.New("panic"))
-	}
-
-	return c.Called().Error(0)
-}
 
 func TestCloseQuietly(t *testing.T) {
 	// No Error

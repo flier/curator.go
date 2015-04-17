@@ -6,20 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 )
-
-type MockTracerDriver struct {
-	mock.Mock
-}
-
-func (t *MockTracerDriver) AddTime(name string, d time.Duration) {
-	t.Called(name, d)
-}
-
-func (t *MockTracerDriver) AddCount(name string, increment int) {
-	t.Called(name, increment)
-}
 
 func TestDefaultTracerDriver(t *testing.T) {
 	var logs []string

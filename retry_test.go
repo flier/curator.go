@@ -9,14 +9,6 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-type MockRetrySleeper struct {
-	mock.Mock
-}
-
-func (s *MockRetrySleeper) SleepFor(time time.Duration) error {
-	return s.Called(time).Error(0)
-}
-
 func TestRetryLoop(t *testing.T) {
 	d := 3 * time.Second
 	p := NewRetryNTimes(3, d)
