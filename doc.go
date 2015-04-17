@@ -1,5 +1,5 @@
 /*
-Curator.go is a Golang porting for Curator, which base on the go-zookeeper.
+Curator.go is a Golang porting for Curator, make it easy to access Zookeeper
 
 
 Learn ZooKeeper

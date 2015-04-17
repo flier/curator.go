@@ -10,34 +10,56 @@ import (
 )
 
 type ZookeeperConnection interface {
+	// Add the specified scheme:auth information to this connection.
 	AddAuth(scheme string, auth []byte) error
 
+	// Close this connection
 	Close()
 
+	// Create a node with the given path.
+	//
+	// The node data will be the given data, and node acl will be the given acl.
 	Create(path string, data []byte, flags int32, acl []zk.ACL) (string, error)
 
+	// Return the stat of the node of the given path. Return nil if no such a node exists.
 	Exists(path string) (bool, *zk.Stat, error)
 
 	ExistsW(path string) (bool, *zk.Stat, <-chan zk.Event, error)
 
+	// Delete the node with the given path.
+	//
+	// The call will succeed if such a node exists,
+	// and the given version matches the node's version
+	// (if the given version is -1, it matches any node's versions).
 	Delete(path string, version int32) error
 
+	// Return the data and the stat of the node of the given path.
 	Get(path string) ([]byte, *zk.Stat, error)
 
 	GetW(path string) ([]byte, *zk.Stat, <-chan zk.Event, error)
 
+	// Set the ACL for the node of the given path
+	// if such a node exists and the given version matches the version of the node.
+	// Return the stat of the node.
 	Set(path string, data []byte, version int32) (*zk.Stat, error)
 
+	// Return the list of the children of the node of the given path.
 	Children(path string) ([]string, *zk.Stat, error)
 
 	ChildrenW(path string) ([]string, *zk.Stat, <-chan zk.Event, error)
 
+	// Return the ACL and stat of the node of the given path.
 	GetACL(path string) ([]zk.ACL, *zk.Stat, error)
 
+	// Set the ACL for the node of the given path
+	// if such a node exists and the given version matches the version of the node.
+	// Return the stat of the node.
 	SetACL(path string, acl []zk.ACL, version int32) (*zk.Stat, error)
 
+	// Executes multiple ZooKeeper operations or none of them.
 	Multi(ops ...interface{}) ([]zk.MultiResponse, error)
 
+	// Flushes channel between process and leader.
 	Sync(path string) (string, error)
 }
 
