@@ -34,13 +34,13 @@ client.GetData().Watched().InBackground().ForPath("/test");
 
 ## Methods
 
-- [Create()](http://godoc.org/github.com/flier/curator.go#CuratorFramework.Create)	Begins a create operation. Call additional methods (mode or background) and finalize the operation by calling forPath()
-- [Delete()](http://godoc.org/github.com/flier/curator.go#CuratorFramework.Delete)	Begins a delete operation. Call additional methods (version or background) and finalize the operation by calling forPath()
-- [CheckExists()](http://godoc.org/github.com/flier/curator.go#CuratorFramework.CheckExists)	Begins an operation to check that a ZNode exists. Call additional methods (watch or background) and finalize the operation by calling forPath()
-- [GetData()](http://godoc.org/github.com/flier/curator.go#CuratorFramework.GetData)	Begins an operation to get a ZNode's data. Call additional methods (watch, background or get stat) and finalize the operation by calling forPath()
-- [SetData()](http://godoc.org/github.com/flier/curator.go#CuratorFramework.SetData)	Begins an operation to set a ZNode's data. Call additional methods (version or background) and finalize the operation by calling forPath()
-- [GetChildren()](http://godoc.org/github.com/flier/curator.go#CuratorFramework.GetChildren)	Begins an operation to get a ZNode's list of children ZNodes. Call additional methods (watch, background or get stat) and finalize the operation by calling forPath()
-- [InTransaction()](http://godoc.org/github.com/flier/curator.go#CuratorFramework.InTransaction)	Begins an atomic ZooKeeper transaction. Combine create, setData, check, and/or delete operations and then commit() as a unit.
+- [Create()](http://godoc.org/github.com/flier/curator.go#CuratorFramework.Create)	Begins a create operation. Call additional methods (mode or background) and finalize the operation by calling ForPath() or ForPathWithData()
+- [Delete()](http://godoc.org/github.com/flier/curator.go#CuratorFramework.Delete)	Begins a delete operation. Call additional methods (version or background) and finalize the operation by calling ForPath()
+- [CheckExists()](http://godoc.org/github.com/flier/curator.go#CuratorFramework.CheckExists)	Begins an operation to check that a ZNode exists. Call additional methods (watch or background) and finalize the operation by calling ForPath()
+- [GetData()](http://godoc.org/github.com/flier/curator.go#CuratorFramework.GetData)	Begins an operation to get a ZNode's data. Call additional methods (watch, background or get stat) and finalize the operation by calling ForPath()
+- [SetData()](http://godoc.org/github.com/flier/curator.go#CuratorFramework.SetData)	Begins an operation to set a ZNode's data. Call additional methods (version or background) and finalize the operation by calling ForPath() or ForPathWithData()
+- [GetChildren()](http://godoc.org/github.com/flier/curator.go#CuratorFramework.GetChildren)	Begins an operation to get a ZNode's list of children ZNodes. Call additional methods (watch, background or get stat) and finalize the operation by calling ForPath()
+- [InTransaction()](http://godoc.org/github.com/flier/curator.go#CuratorFramework.InTransaction)	Begins an atomic ZooKeeper transaction. Combine Create, SetData, Check, and/or Delete operations and then Commit() as a unit.
 
 ## Notifications
 
