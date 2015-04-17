@@ -256,13 +256,13 @@ func (c *curatorFramework) GetChildren() GetChildrenBuilder {
 func (c *curatorFramework) GetACL() GetACLBuilder {
 	c.state.Check(STARTED, "instance must be started before calling this method")
 
-	return nil
+	return &getACLBuilder{client: c}
 }
 
 func (c *curatorFramework) SetACL() SetACLBuilder {
 	c.state.Check(STARTED, "instance must be started before calling this method")
 
-	return nil
+	return &setACLBuilder{client: c, version: -1}
 }
 
 func (c *curatorFramework) InTransaction() CuratorTransaction {

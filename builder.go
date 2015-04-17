@@ -26,7 +26,7 @@ type CreateBuilder interface {
 	// ACLable[T]
 	//
 	// Set an ACL list
-	WithACL(acl ...zk.ACL) CreateBuilder
+	WithACL(acls ...zk.ACL) CreateBuilder
 
 	// Compressible[T]
 	//
@@ -216,9 +216,60 @@ type GetChildrenBuilder interface {
 }
 
 type GetACLBuilder interface {
+	// Pathable[T]
+	//
+	// Commit the currently building operation using the given path
+	ForPath(path string) ([]zk.ACL, error)
+
+	// Statable[T]
+	//
+	// Have the operation fill the provided stat object
+	StoringStatIn(stat *zk.Stat) GetACLBuilder
+
+	// Backgroundable[T]
+	//
+	// Perform the action in the background
+	InBackground() GetACLBuilder
+
+	// Perform the action in the background
+	InBackgroundWithContext(context interface{}) GetACLBuilder
+
+	// Perform the action in the background
+	InBackgroundWithCallback(callback BackgroundCallback) GetACLBuilder
+
+	// Perform the action in the background
+	InBackgroundWithCallbackAndContext(callback BackgroundCallback, context interface{}) GetACLBuilder
 }
 
 type SetACLBuilder interface {
+	// Pathable[T]
+	//
+	// Commit the currently building operation using the given path
+	ForPath(path string) (*zk.Stat, error)
+
+	// ACLable[T]
+	//
+	// Set an ACL list
+	WithACL(acls ...zk.ACL) SetACLBuilder
+
+	// Versionable[T]
+	//
+	// Use the given version (the default is -1)
+	WithVersion(version int) SetACLBuilder
+
+	// Backgroundable[T]
+	//
+	// Perform the action in the background
+	InBackground() SetACLBuilder
+
+	// Perform the action in the background
+	InBackgroundWithContext(context interface{}) SetACLBuilder
+
+	// Perform the action in the background
+	InBackgroundWithCallback(callback BackgroundCallback) SetACLBuilder
+
+	// Perform the action in the background
+	InBackgroundWithCallbackAndContext(callback BackgroundCallback, context interface{}) SetACLBuilder
 }
 
 type TransactionCreateBuilder interface {

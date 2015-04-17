@@ -60,3 +60,14 @@ func SetDataAsyncWithCallback(client curator.CuratorFramework, callback curator.
 	// this is another method of getting notification of an async completion
 	return client.SetData().InBackgroundWithCallback(callback).ForPathWithData(path, payload)
 }
+
+func WatchedGetChildren(client curator.CuratorFramework, path string) ([]string, error) {
+	// Get children and set a watcher on the node.
+	// The watcher notification will come through the CuratorListener (see SetDataAsync() above).
+	return client.GetChildren().Watched().ForPath(path)
+}
+
+func UsingWatcherGetChildren(client curator.CuratorFramework, path string, watcher curator.Watcher) ([]string, error) {
+	// Get children and set the given watcher on the node.
+	return client.GetChildren().UsingWatcher(watcher).ForPath(path)
+}

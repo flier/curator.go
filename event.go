@@ -47,7 +47,7 @@ type CuratorEvent interface {
 	Children() []string
 
 	// any ACL list or null
-	ACLs() []*zk.ACL
+	ACLs() []zk.ACL
 
 	WatchedEvent() *zk.Event
 }
@@ -62,7 +62,7 @@ type curatorEvent struct {
 	stat         *zk.Stat
 	data         []byte
 	watchedEvent *zk.Event
-	acls         []*zk.ACL
+	acls         []zk.ACL
 }
 
 func (e *curatorEvent) Type() CuratorEventType { return e.eventType }
@@ -81,6 +81,6 @@ func (e *curatorEvent) Name() string { return e.name }
 
 func (e *curatorEvent) Children() []string { return e.children }
 
-func (e *curatorEvent) ACLs() []*zk.ACL { return e.acls }
+func (e *curatorEvent) ACLs() []zk.ACL { return e.acls }
 
 func (e *curatorEvent) WatchedEvent() *zk.Event { return e.watchedEvent }
