@@ -2,6 +2,7 @@ package curator
 
 import (
 	"fmt"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -146,6 +147,7 @@ type curatorFramework struct {
 	listeners               CuratorListenable
 	unhandledErrorListeners UnhandledErrorListenable
 	defaultData             []byte
+	namespace               string
 	retryPolicy             RetryPolicy
 	compressionProvider     CompressionProvider
 	aclProvider             ACLProvider
@@ -156,6 +158,7 @@ func newCuratorFramework(b *CuratorFrameworkBuilder) *curatorFramework {
 		listeners:               NewCuratorListenerContainer(),
 		unhandledErrorListeners: NewUnhandledErrorListenerContainer(),
 		defaultData:             b.DefaultData,
+		namespace:               b.Namespace,
 		retryPolicy:             b.RetryPolicy,
 		compressionProvider:     b.CompressionProvider,
 		aclProvider:             b.AclProvider,
@@ -295,10 +298,25 @@ func (c *curatorFramework) processEvent(event CuratorEvent) {
 }
 
 func (c *curatorFramework) fixForNamespace(path string, isSequential bool) string {
+	if len(c.namespace) > 0 {
+		return JoinPath(c.namespace, path)
+	}
+
 	return path
 }
 
 func (c *curatorFramework) unfixForNamespace(path string) string {
+	if len(c.namespace) > 0 {
+		prefix := JoinPath(c.namespace)
+
+		if strings.HasPrefix(path, prefix) {
+			if len(path) > len(prefix) {
+				return path[len(prefix):]
+			} else {
+				return PATH_SEPARATOR
+			}
+		}
+	}
 	return path
 }
 
