@@ -2,7 +2,6 @@ package curator
 
 import (
 	"fmt"
-	"strings"
 	"sync/atomic"
 	"time"
 
@@ -94,6 +93,16 @@ type CuratorFramework interface {
 	// Returns the listenable interface for unhandled errors
 	UnhandledErrorListenable() UnhandledErrorListenable
 
+	// Returns a facade of the current instance that does _not_ automatically pre-pend the namespace to all paths
+	NonNamespaceView() CuratorFramework
+
+	// Returns a facade of the current instance that uses the specified namespace
+	// or no namespace if newNamespace is empty.
+	UsingNamespace(newNamespace string) CuratorFramework
+
+	// Return the current namespace or "" if none
+	Namespace() string
+
 	// Return the managed zookeeper client
 	ZookeeperClient() *CuratorZookeeperClient
 }
@@ -149,6 +158,7 @@ func (b *CuratorFrameworkBuilder) Authorization(scheme string, auth []byte) *Cur
 type curatorFramework struct {
 	client                  *CuratorZookeeperClient
 	stateManager            *ConnectionStateManager
+	namespaceFacadeCache    *namespaceFacadeCache
 	state                   CuratorFrameworkState
 	listeners               CuratorListenable
 	unhandledErrorListeners UnhandledErrorListenable
@@ -181,6 +191,7 @@ func newCuratorFramework(b *CuratorFrameworkBuilder) *curatorFramework {
 
 	c.client = NewCuratorZookeeperClient(b.ZookeeperDialer, b.EnsembleProvider, b.SessionTimeout, b.ConnectionTimeout, watcher, b.RetryPolicy, b.CanBeReadOnly, b.AuthInfos)
 	c.stateManager = NewConnectionStateManager(c)
+	c.namespaceFacadeCache = NewNamespaceFacadeCache(c)
 
 	return c
 }
@@ -302,10 +313,6 @@ func (c *curatorFramework) UnhandledErrorListenable() UnhandledErrorListenable {
 	return c.unhandledErrorListeners
 }
 
-func (c *curatorFramework) ZookeeperClient() *CuratorZookeeperClient {
-	return c.client
-}
-
 func (c *curatorFramework) processEvent(event CuratorEvent) {
 	if event.Type() == WATCHED {
 
@@ -313,29 +320,32 @@ func (c *curatorFramework) processEvent(event CuratorEvent) {
 
 }
 
-func (c *curatorFramework) fixForNamespace(path string, isSequential bool) string {
-	if len(c.namespace) > 0 {
-		return JoinPath(c.namespace, path)
-	}
+func (c *curatorFramework) NonNamespaceView() CuratorFramework {
+	return c.UsingNamespace("")
+}
 
-	return path
+func (c *curatorFramework) UsingNamespace(newNamespace string) CuratorFramework {
+	c.state.Check(STARTED, "instance must be started before calling this method")
+
+	return c.namespaceFacadeCache.Get(newNamespace)
+}
+
+func (c *curatorFramework) Namespace() string {
+	return c.namespace
+}
+
+func (c *curatorFramework) fixForNamespace(path string, isSequential bool) string {
+	return fixForNamespace(c.namespace, path, isSequential)
 }
 
 func (c *curatorFramework) unfixForNamespace(path string) string {
-	if len(c.namespace) > 0 {
-		prefix := JoinPath(c.namespace)
-
-		if strings.HasPrefix(path, prefix) {
-			if len(path) > len(prefix) {
-				return path[len(prefix):]
-			} else {
-				return PATH_SEPARATOR
-			}
-		}
-	}
-	return path
+	return unfixForNamespace(c.namespace, path)
 }
 
 func (c *curatorFramework) getNamespaceWatcher(watcher Watcher) Watcher {
 	return watcher
+}
+
+func (c *curatorFramework) ZookeeperClient() *CuratorZookeeperClient {
+	return c.client
 }
