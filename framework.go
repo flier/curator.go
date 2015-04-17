@@ -157,7 +157,7 @@ func (b *CuratorFrameworkBuilder) Authorization(scheme string, auth []byte) *Cur
 
 type curatorFramework struct {
 	client                  *CuratorZookeeperClient
-	stateManager            *ConnectionStateManager
+	stateManager            *connectionStateManager
 	namespaceFacadeCache    *namespaceFacadeCache
 	state                   CuratorFrameworkState
 	listeners               CuratorListenable
@@ -171,8 +171,8 @@ type curatorFramework struct {
 
 func newCuratorFramework(b *CuratorFrameworkBuilder) *curatorFramework {
 	c := &curatorFramework{
-		listeners:               NewCuratorListenerContainer(),
-		unhandledErrorListeners: NewUnhandledErrorListenerContainer(),
+		listeners:               newCuratorListenerContainer(),
+		unhandledErrorListeners: newUnhandledErrorListenerContainer(),
 		defaultData:             b.DefaultData,
 		namespace:               b.Namespace,
 		retryPolicy:             b.RetryPolicy,
@@ -190,8 +190,8 @@ func newCuratorFramework(b *CuratorFrameworkBuilder) *curatorFramework {
 	})
 
 	c.client = NewCuratorZookeeperClient(b.ZookeeperDialer, b.EnsembleProvider, b.SessionTimeout, b.ConnectionTimeout, watcher, b.RetryPolicy, b.CanBeReadOnly, b.AuthInfos)
-	c.stateManager = NewConnectionStateManager(c)
-	c.namespaceFacadeCache = NewNamespaceFacadeCache(c)
+	c.stateManager = newConnectionStateManager(c)
+	c.namespaceFacadeCache = newNamespaceFacadeCache(c)
 
 	return c
 }

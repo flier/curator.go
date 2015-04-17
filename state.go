@@ -123,21 +123,21 @@ func (s *ZookeeperConnectionState) removeParentWatcher(watcher Watcher) Watcher 
 	return s.parentWatchers.Remove(watcher)
 }
 
-type ConnectionStateManager struct {
+type connectionStateManager struct {
 	client                 CuratorFramework
 	listeners              ConnectionStateListenable
 	state                  CuratorFrameworkState
 	currentConnectionState ConnectionState
 }
 
-func NewConnectionStateManager(client CuratorFramework) *ConnectionStateManager {
-	return &ConnectionStateManager{
+func newConnectionStateManager(client CuratorFramework) *connectionStateManager {
+	return &connectionStateManager{
 		client:    client,
-		listeners: NewConnectionStateListenerContainer(),
+		listeners: newConnectionStateListenerContainer(),
 	}
 }
 
-func (m *ConnectionStateManager) Start() error {
+func (m *connectionStateManager) Start() error {
 	if !m.state.Change(LATENT, STARTED) {
 		return fmt.Errorf("Cannot be started more than once")
 	}
@@ -145,7 +145,7 @@ func (m *ConnectionStateManager) Start() error {
 	return nil
 }
 
-func (m *ConnectionStateManager) Close() error {
+func (m *connectionStateManager) Close() error {
 	if !m.state.Change(STARTED, STOPPED) {
 		return nil
 	}

@@ -14,7 +14,7 @@ type simpleWatcher struct {
 	Func func(event *zk.Event)
 }
 
-func NewWatcher(fn func(event *zk.Event)) *simpleWatcher {
+func NewWatcher(fn func(event *zk.Event)) Watcher {
 	return &simpleWatcher{fn}
 }
 

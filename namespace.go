@@ -64,7 +64,7 @@ type namespaceFacadeCache struct {
 	lock   sync.Mutex
 }
 
-func NewNamespaceFacadeCache(client *curatorFramework) *namespaceFacadeCache {
+func newNamespaceFacadeCache(client *curatorFramework) *namespaceFacadeCache {
 	return &namespaceFacadeCache{
 		client: client,
 		cache:  make(map[string]*namespaceFacade),
