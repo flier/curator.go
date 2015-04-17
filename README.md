@@ -97,12 +97,6 @@ This module contains example usages of various Curator features. Each directory 
 
 See the [examples](../../tree/master/examples/) source repo for each example.
 
-# Recipes
-
-Curator implements all of the recipes listed on the ZooKeeper recipes doc (except two phase commit). Click on the recipe name below for detailed documentation.
-
-TODO
-
 # Components
 
 - [Recipes](doc/recipes.md) Implementations of some of the common ZooKeeper "recipes". The implementations are built on top of the Curator Framework.
@@ -110,4 +104,3 @@ TODO
 - [Utilities](doc/utilities.md) Various utilities that are useful when using ZooKeeper.
 - [Client](doc/client.md) A replacement for the bundled ZooKeeper class that takes care of some low-level housekeeping and provides some useful utilities.
 - [Errors](doc/errors.md) How Curator deals with errors, connection issues, recoverable exceptions, etc.
-Extensions	The curator-recipes package implements the common recipes that are described in the ZooKeeper documentation. To avoid bloating that package, recipes/applications that have a vertical appeal will be put in separate "extension" packages using the naming convention curator-x-name.
