@@ -39,7 +39,6 @@ func (s *CreateBuilderTestSuite) SetupTest() {
 	s.events = make(chan zk.Event)
 
 	s.dialer.On("Dial", s.builder.EnsembleProvider.ConnectionString(), s.builder.ConnectionTimeout, s.builder.CanBeReadOnly).Return(s.conn, s.events, nil).Once()
-
 }
 
 func (s *CreateBuilderTestSuite) TearDownTest() {
@@ -83,6 +82,8 @@ func (s *CreateBuilderTestSuite) TestNamespace() {
 }
 
 func (s *CreateBuilderTestSuite) TestBackground() {
+	s.builder.Namespace = "parent"
+
 	client := s.builder.Build()
 
 	assert.NoError(s.T(), client.Start())
@@ -91,7 +92,7 @@ func (s *CreateBuilderTestSuite) TestBackground() {
 	acls := zk.AuthACL(zk.PermRead)
 	ctxt := "context"
 
-	s.conn.On("Create", "/node", data, int32(PERSISTENT), acls).Return("", zk.ErrAPIError).Once()
+	s.conn.On("Create", "/parent/child", data, int32(PERSISTENT), acls).Return("", zk.ErrAPIError).Once()
 
 	s.wg.Add(1)
 
@@ -100,18 +101,18 @@ func (s *CreateBuilderTestSuite) TestBackground() {
 			defer s.wg.Done()
 
 			assert.Equal(s.T(), CREATE, event.Type())
-			assert.Equal(s.T(), "/node", event.Path())
+			assert.Equal(s.T(), "/child", event.Path())
 			assert.Equal(s.T(), data, event.Data())
 			assert.Equal(s.T(), acls, event.ACLs())
 			assert.EqualError(s.T(), event.Err(), zk.ErrAPIError.Error())
 			assert.Equal(s.T(), ctxt, event.Context())
 
 			return nil
-		}, ctxt).ForPathWithData("/node", data)
+		}, ctxt).ForPathWithData("/child", data)
 
 	s.wg.Wait()
 
-	assert.Equal(s.T(), "/node", path)
+	assert.Equal(s.T(), "/child", path)
 	assert.NoError(s.T(), err)
 }
 
