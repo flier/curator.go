@@ -52,6 +52,7 @@ func (b *createBuilder) pathInBackground(path string, payload []byte, givenPath 
 			err:       err,
 			path:      createdPath,
 			data:      payload,
+			acls:      b.acling.aclList,
 			context:   b.backgrounding.context,
 		}
 

@@ -40,6 +40,7 @@ func (b *getChildrenBuilder) pathInBackground(adjustedPath, givenPath string) {
 			err:       err,
 			path:      b.client.unfixForNamespace(adjustedPath),
 			children:  children,
+			stat:      b.stat,
 			context:   b.backgrounding.context,
 		}
 

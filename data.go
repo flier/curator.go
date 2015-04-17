@@ -47,6 +47,7 @@ func (b *getDataBuilder) pathInBackground(adjustedPath, givenPath string) {
 			err:       err,
 			path:      b.client.unfixForNamespace(adjustedPath),
 			data:      data,
+			stat:      b.stat,
 			context:   b.backgrounding.context,
 		}
 
