@@ -2,6 +2,8 @@
 
 Curator n ˈkyoor͝ˌātər: a keeper or custodian of a museum or other collection - A ZooKeeper Keeper.
 
+![curator](http://curator.apache.org/images/ph-quote.png "Patrick Hunt Quote")
+
 ## What is curator.go?
 
 Curator.go is a Golang porting for Curator, which base on the [go-zookeeper](https://github.com/samuel/go-zookeeper/).
@@ -89,13 +91,13 @@ selector.Start()
 # Examples
 This module contains example usages of various Curator features. Each directory in the module is a separate example.
 
-- [leader](examples/leader) Example leader selector code 
-- [cache](examples/cache) Example PathChildrenCache usage
-- [locking](examples/locking) Example of using InterProcessMutex
-- [discovery](examples/discovery) Example usage of the Curator's ServiceDiscovery
-- [framework](examples/framework) A few examples of how to use the CuratorFramework class
+- [leader](examples/leader/) Example leader selector code 
+- [cache](examples/cache/) Example PathChildrenCache usage
+- [locking](examples/locking/) Example of using InterProcessMutex
+- [discovery](examples/discovery/) Example usage of the Curator's ServiceDiscovery
+- [framework](examples/framework/) A few examples of how to use the CuratorFramework class
 
-See the [examples](../../tree/master/examples/) source repo for each example.
+See the [examples](examples/) source repo for each example.
 
 # Components
 
