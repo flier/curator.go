@@ -164,10 +164,41 @@ func (c *mockConn) Sync(path string) (string, error) {
 	return args.String(0), args.Error(1)
 }
 
+type mockZookeeperDialer struct {
+	mock.Mock
+}
+
+func (d *mockZookeeperDialer) Dial(connString string, sessionTimeout time.Duration, canBeReadOnly bool) (ZookeeperConnection, <-chan zk.Event, error) {
+	args := d.Called(connString, sessionTimeout, canBeReadOnly)
+
+	conn, _ := args.Get(0).(ZookeeperConnection)
+	events, _ := args.Get(1).(chan zk.Event)
+
+	return conn, events, args.Error(2)
+}
+
+type mockCompressionProvider struct {
+	mock.Mock
+}
+
+func (p *mockCompressionProvider) Compress(path string, data []byte) ([]byte, error) {
+	args := p.Called(path, data)
+
+	compressedData, _ := args.Get(0).([]byte)
+
+	return compressedData, args.Error(1)
+}
+
+func (p *mockCompressionProvider) Decompress(path string, compressedData []byte) ([]byte, error) {
+	args := p.Called(path, compressedData)
+
+	data, _ := args.Get(0).([]byte)
+
+	return data, args.Error(1)
+}
+
 type mockACLProvider struct {
 	mock.Mock
-
-	ACLProvider
 }
 
 func (p *mockACLProvider) GetDefaultAcl() []zk.ACL {
