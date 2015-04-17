@@ -56,7 +56,7 @@ The benefit here is that Curator manages the ZooKeeper connection and will retry
 Recipes
 
 
-Distributed Lock
+  Distributed Lock
 
 
 	lock := curator.NewInterProcessMutex(client, lockPath)
@@ -69,7 +69,7 @@ Distributed Lock
 	}
 
 
-Leader Election
+  Leader Election
 
 
 	listener := curator.NewLeaderSelectorListener(func(CuratorFramework client) error {
@@ -82,5 +82,84 @@ Leader Election
 	selector.AutoRequeue()  // not required, but this is behavior that you will probably expect
 	selector.Start()
 
+
+Generic API
+
+
+Curator provides generic API for builder
+
+	type Pathable[T] interface {
+		// Commit the currently building operation using the given path
+		ForPath(path string) (T, error)
+	}
+
+	type PathAndBytesable[T] interface {
+		Pathable[T]
+
+		// Commit the currently building operation using the given path and data
+		ForPathWithData(path string, payload []byte) (T, error)
+	}
+
+	type Compressible[T] interface {
+		// Cause the data to be compressed using the configured compression provider
+		Compressed() T
+	}
+
+	type Decompressible[T] interface {
+		// Cause the data to be de-compressed using the configured compression provider
+		Decompressed() T
+	}
+
+	type CreateModable[T] interface {
+		// Set a create mode - the default is CreateMode.PERSISTENT
+		WithMode(mode CreateMode) T
+	}
+
+	type ACLable[T] interface {
+		// Set an ACL list
+		WithACL(acl ...zk.ACL) T
+	}
+
+	type Versionable[T] interface {
+		// Use the given version (the default is -1)
+		WithVersion(version int) T
+	}
+
+	type Statable[T] interface {
+		// Have the operation fill the provided stat object
+		StoringStatIn(*zk.Stat) T
+	}
+
+	type ParentsCreatable[T] interface {
+		// Causes any parent nodes to get created if they haven't already been
+		CreatingParentsIfNeeded() T
+	}
+
+	type ChildrenDeletable[T] interface {
+		// Will also delete children if they exist.
+		DeletingChildrenIfNeeded() T
+	}
+
+	type Watchable[T] interface {
+		// Have the operation set a watch
+		Watched() T
+
+		// Set a watcher for the operation
+		UsingWatcher(watcher Watcher) T
+	}
+
+	type Backgroundable[T] interface {
+		// Perform the action in the background
+		InBackground() T
+
+		// Perform the action in the background
+		InBackgroundWithContext(context interface{}) T
+
+		// Perform the action in the background
+		InBackgroundWithCallback(callback BackgroundCallback) T
+
+		// Perform the action in the background
+		InBackgroundWithCallbackAndContext(callback BackgroundCallback, context interface{}) T
+	}
 */
 package curator
