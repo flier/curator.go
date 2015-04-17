@@ -32,8 +32,8 @@ type ZookeeperConnectionState struct {
 	tracer            TracerDriver
 	canReadOnly       bool
 	authInfos         []AuthInfo
+	parentWatchers    *Watchers
 	conn              ZookeeperConnection
-	parentWatchers    Watchers
 }
 
 func newZookeeperConnectionState(zookeeperDialer ZookeeperDialer, ensembleProvider EnsembleProvider, sessionTimeout, connectionTimeout time.Duration,
@@ -47,6 +47,7 @@ func newZookeeperConnectionState(zookeeperDialer ZookeeperDialer, ensembleProvid
 		tracer:            tracer,
 		canReadOnly:       canReadOnly,
 		authInfos:         authInfos,
+		parentWatchers:    NewWatchers(),
 	}
 
 	if zookeeperDialer == nil {
@@ -80,9 +81,11 @@ func (s *ZookeeperConnectionState) Conn() (ZookeeperConnection, error) {
 			}
 		}
 
-		go s.parentWatchers.Watch(events)
-
 		s.conn = conn
+
+		if events != nil {
+			go s.parentWatchers.Watch(events)
+		}
 
 		return conn, nil
 	}

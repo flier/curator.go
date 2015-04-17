@@ -8,6 +8,8 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+type infof func(format string, args ...interface{})
+
 type mockCloseable struct {
 	mock.Mock
 
@@ -45,7 +47,7 @@ func (s *mockRetrySleeper) SleepFor(time time.Duration) error {
 type mockConn struct {
 	mock.Mock
 
-	ZookeeperConnection
+	log infof
 }
 
 func (c *mockConn) AddAuth(scheme string, auth []byte) error {
@@ -58,10 +60,17 @@ func (c *mockConn) Close() {
 	c.Called()
 }
 
-func (c *mockConn) Create(path string, data []byte, flags int32, acl []zk.ACL) (string, error) {
-	args := c.Called(path, data, flags, acl)
+func (c *mockConn) Create(path string, data []byte, flags int32, acls []zk.ACL) (string, error) {
+	args := c.Called(path, data, flags, acls)
 
-	return args.String(0), args.Error(1)
+	createPath := args.String(0)
+	err := args.Error(1)
+
+	if c.log != nil {
+		c.log("Create(\"%s\", []byte(\"%s\"), %d, %v) (\"%s\", %v)", path, data, flags, acls, createPath, err)
+	}
+
+	return createPath, err
 }
 
 func (c *mockConn) Exists(path string) (bool, *zk.Stat, error) {
@@ -166,6 +175,8 @@ func (c *mockConn) Sync(path string) (string, error) {
 
 type mockZookeeperDialer struct {
 	mock.Mock
+
+	log infof
 }
 
 func (d *mockZookeeperDialer) Dial(connString string, sessionTimeout time.Duration, canBeReadOnly bool) (ZookeeperConnection, <-chan zk.Event, error) {
@@ -173,28 +184,45 @@ func (d *mockZookeeperDialer) Dial(connString string, sessionTimeout time.Durati
 
 	conn, _ := args.Get(0).(ZookeeperConnection)
 	events, _ := args.Get(1).(chan zk.Event)
+	err := args.Error(2)
 
-	return conn, events, args.Error(2)
+	if d.log != nil {
+		d.log("Dial(\"%s\", %v, %v)(%p, %v, %v)", connString, sessionTimeout, canBeReadOnly, conn, events, err)
+	}
+
+	return conn, events, err
 }
 
 type mockCompressionProvider struct {
 	mock.Mock
+
+	log infof
 }
 
 func (p *mockCompressionProvider) Compress(path string, data []byte) ([]byte, error) {
 	args := p.Called(path, data)
 
 	compressedData, _ := args.Get(0).([]byte)
+	err := args.Error(1)
 
-	return compressedData, args.Error(1)
+	if p.log != nil {
+		p.log("Compress(\"%s\", []byte(\"%s\"))([]byte(\"%s\"), %v)", path, data, compressedData, err)
+	}
+
+	return compressedData, err
 }
 
 func (p *mockCompressionProvider) Decompress(path string, compressedData []byte) ([]byte, error) {
 	args := p.Called(path, compressedData)
 
 	data, _ := args.Get(0).([]byte)
+	err := args.Error(1)
 
-	return data, args.Error(1)
+	if p.log != nil {
+		p.log("Decompress(\"%s\", []byte(\"%s\"))([]byte(\"%s\"), %v)", path, compressedData, data, err)
+	}
+
+	return data, err
 }
 
 type mockACLProvider struct {

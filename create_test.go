@@ -6,149 +6,147 @@ import (
 
 	"github.com/samuel/go-zookeeper/zk"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
+type CreateBuilderTestSuite struct {
+	suite.Suite
+
+	conn        *mockConn
+	dialer      *mockZookeeperDialer
+	compress    *mockCompressionProvider
+	aclProvider *mockACLProvider
+	builder     *CuratorFrameworkBuilder
+	events      chan zk.Event
+	wg          sync.WaitGroup
+}
+
 func TestCreateBuilder(t *testing.T) {
-	conn := &mockConn{}
-	dialer := &mockZookeeperDialer{}
-	builder := &CuratorFrameworkBuilder{
-		ZookeeperDialer: dialer,
+	suite.Run(t, new(CreateBuilderTestSuite))
+}
+
+func (s *CreateBuilderTestSuite) SetupTest() {
+	s.conn = &mockConn{log: s.T().Logf}
+	s.dialer = &mockZookeeperDialer{log: s.T().Logf}
+	s.compress = &mockCompressionProvider{log: s.T().Logf}
+	s.builder = &CuratorFrameworkBuilder{
+		ZookeeperDialer:     s.dialer,
+		EnsembleProvider:    &fixedEnsembleProvider{"connectString"},
+		CompressionProvider: s.compress,
+		RetryPolicy:         NewRetryOneTime(0),
+		DefaultData:         []byte("default"),
 	}
-	client := builder.ConnectString("connString").Build()
-	client.(*curatorFramework).state = STARTED
+	s.events = make(chan zk.Event)
+
+	s.dialer.On("Dial", s.builder.EnsembleProvider.ConnectionString(), s.builder.ConnectionTimeout, s.builder.CanBeReadOnly).Return(s.conn, s.events, nil).Once()
+
+}
+
+func (s *CreateBuilderTestSuite) TearDownTest() {
+	close(s.events)
+
+	s.conn.AssertExpectations(s.T())
+	s.dialer.AssertExpectations(s.T())
+	s.compress.AssertExpectations(s.T())
+}
+
+func (s *CreateBuilderTestSuite) TestCreate() {
+	client := s.builder.Build()
+
+	assert.NoError(s.T(), client.Start())
+
 	acls := zk.WorldACL(zk.PermAll)
 
-	dialer.On("Dial", "connString", builder.ConnectionTimeout, false).Return(conn, nil, nil).Once()
-	conn.On("Create", "/node", builder.DefaultData, int32(EPHEMERAL), acls).Return("/node", nil).Once()
+	s.conn.On("Create", "/node", s.builder.DefaultData, int32(EPHEMERAL), acls).Return("/node", nil).Once()
 
 	path, err := client.Create().WithMode(EPHEMERAL).WithACL(acls...).ForPath("/node")
 
-	assert.Equal(t, "/node", path)
-	assert.NoError(t, err)
-
-	conn.AssertExpectations(t)
-	dialer.AssertExpectations(t)
+	assert.Equal(s.T(), "/node", path)
+	assert.NoError(s.T(), err)
 }
 
-func TestCreateBuilderWithNamespace(t *testing.T) {
-	conn := &mockConn{}
-	dialer := &mockZookeeperDialer{}
-	builder := &CuratorFrameworkBuilder{
-		ZookeeperDialer: dialer,
-		DefaultData:     []byte("default"),
-		Namespace:       "parent",
-	}
-	client := builder.ConnectString("connString").Build()
-	client.(*curatorFramework).state = STARTED
+func (s *CreateBuilderTestSuite) TestNamespace() {
+	s.builder.Namespace = "parent"
+
+	client := s.builder.Build()
+
+	assert.NoError(s.T(), client.Start())
+
 	acls := zk.WorldACL(zk.PermAll)
 
-	dialer.On("Dial", "connString", builder.ConnectionTimeout, false).Return(conn, nil, nil).Once()
-	conn.On("Create", "/parent/child", builder.DefaultData, int32(EPHEMERAL), acls).Return("/parent/child", nil).Once()
+	s.conn.On("Create", "/parent/child", s.builder.DefaultData, int32(EPHEMERAL), acls).Return("/parent/child", nil).Once()
 
 	path, err := client.Create().WithMode(EPHEMERAL).WithACL(acls...).ForPath("child")
 
-	assert.Equal(t, "/child", path)
-	assert.NoError(t, err)
-
-	conn.AssertExpectations(t)
-	dialer.AssertExpectations(t)
+	assert.Equal(s.T(), "/child", path)
+	assert.NoError(s.T(), err)
 }
 
-func TestCreateBuilderInBackground(t *testing.T) {
-	conn := &mockConn{}
-	dialer := &mockZookeeperDialer{}
-	builder := &CuratorFrameworkBuilder{
-		ZookeeperDialer: dialer,
-		RetryPolicy:     NewRetryOneTime(0),
-	}
-	client := builder.ConnectString("connString").Build()
-	client.(*curatorFramework).state = STARTED
+func (s *CreateBuilderTestSuite) TestBackground() {
+	client := s.builder.Build()
+
+	assert.NoError(s.T(), client.Start())
 
 	data := []byte("data")
 	acls := zk.AuthACL(zk.PermRead)
 	ctxt := "context"
 
-	dialer.On("Dial", "connString", builder.ConnectionTimeout, false).Return(conn, nil, nil).Once()
-	conn.On("Create", "/node", data, int32(PERSISTENT), acls).Return("", zk.ErrAPIError).Once()
+	s.conn.On("Create", "/node", data, int32(PERSISTENT), acls).Return("", zk.ErrAPIError).Once()
 
-	var wg sync.WaitGroup
-
-	wg.Add(1)
+	s.wg.Add(1)
 
 	path, err := client.Create().WithACL(acls...).InBackgroundWithCallbackAndContext(
 		func(client CuratorFramework, event CuratorEvent) error {
-			defer wg.Done()
+			defer s.wg.Done()
 
-			assert.Equal(t, CREATE, event.Type())
-			assert.Equal(t, "/node", event.Path())
-			assert.Equal(t, data, event.Data())
-			assert.Equal(t, acls, event.ACLs())
-			assert.EqualError(t, event.Err(), zk.ErrAPIError.Error())
-			assert.Equal(t, ctxt, event.Context())
+			assert.Equal(s.T(), CREATE, event.Type())
+			assert.Equal(s.T(), "/node", event.Path())
+			assert.Equal(s.T(), data, event.Data())
+			assert.Equal(s.T(), acls, event.ACLs())
+			assert.EqualError(s.T(), event.Err(), zk.ErrAPIError.Error())
+			assert.Equal(s.T(), ctxt, event.Context())
 
 			return nil
 		}, ctxt).ForPathWithData("/node", data)
 
-	wg.Wait()
+	s.wg.Wait()
 
-	assert.Equal(t, "/node", path)
-	assert.NoError(t, err)
-
-	conn.AssertExpectations(t)
-	dialer.AssertExpectations(t)
+	assert.Equal(s.T(), "/node", path)
+	assert.NoError(s.T(), err)
 }
 
-func TestCreateBuilderWithCompression(t *testing.T) {
-	conn := &mockConn{}
-	dialer := &mockZookeeperDialer{}
-	compress := &mockCompressionProvider{}
+func (s *CreateBuilderTestSuite) TestCompression() {
+	client := s.builder.Build()
 
-	builder := &CuratorFrameworkBuilder{
-		ZookeeperDialer:     dialer,
-		CompressionProvider: compress,
-	}
-	client := builder.ConnectString("connString").Build()
-	client.(*curatorFramework).state = STARTED
+	assert.NoError(s.T(), client.Start())
 
 	data := []byte("data")
 	compressedData := []byte("compressedData")
 	acls := zk.WorldACL(zk.PermAll)
 
-	dialer.On("Dial", "connString", builder.ConnectionTimeout, false).Return(conn, nil, nil).Once()
-	compress.On("Compress", "/node", data).Return(compressedData, nil).Once()
-	conn.On("Create", "/node", compressedData, int32(PERSISTENT), acls).Return("/node", nil).Once()
+	s.compress.On("Compress", "/node", data).Return(compressedData, nil).Once()
+	s.conn.On("Create", "/node", compressedData, int32(PERSISTENT), acls).Return("/node", nil).Once()
 
 	path, err := client.Create().Compressed().WithACL(acls...).ForPathWithData("/node", data)
 
-	assert.Equal(t, "/node", path)
-	assert.NoError(t, err)
-
-	conn.AssertExpectations(t)
-	dialer.AssertExpectations(t)
-	compress.AssertExpectations(t)
+	assert.Equal(s.T(), "/node", path)
+	assert.NoError(s.T(), err)
 }
 
-func TestCreateBuilderWithParents(t *testing.T) {
-	conn := &mockConn{}
-	dialer := &mockZookeeperDialer{}
-	builder := &CuratorFrameworkBuilder{
-		ZookeeperDialer: dialer,
-		Namespace:       "parent",
-	}
-	client := builder.ConnectString("connString").Build()
-	client.(*curatorFramework).state = STARTED
+func (s *CreateBuilderTestSuite) TestCreateParents() {
+	s.builder.Namespace = "parent"
 
-	dialer.On("Dial", "connString", builder.ConnectionTimeout, false).Return(conn, nil, nil).Once()
-	conn.On("Create", "/parent/child", builder.DefaultData, int32(PERSISTENT), []zk.ACL(nil)).Return("", zk.ErrNoNode).Once()
-	conn.On("Exists", "/parent").Return(false, nil, nil).Once()
-	conn.On("Create", "/parent", []byte{}, int32(PERSISTENT), zk.WorldACL(zk.PermAll)).Return("/parent", nil).Once()
-	conn.On("Create", "/parent/child", builder.DefaultData, int32(PERSISTENT), []zk.ACL(nil)).Return("/parent/child", nil).Once()
+	client := s.builder.Build()
+
+	assert.NoError(s.T(), client.Start())
+
+	s.conn.On("Create", "/parent/child", s.builder.DefaultData, int32(PERSISTENT), []zk.ACL(nil)).Return("", zk.ErrNoNode).Once()
+	s.conn.On("Exists", "/parent").Return(false, nil, nil).Once()
+	s.conn.On("Create", "/parent", []byte{}, int32(PERSISTENT), zk.WorldACL(zk.PermAll)).Return("/parent", nil).Once()
+	s.conn.On("Create", "/parent/child", s.builder.DefaultData, int32(PERSISTENT), []zk.ACL(nil)).Return("/parent/child", nil).Once()
 
 	path, err := client.Create().CreatingParentsIfNeeded().ForPath("/child")
 
-	assert.Equal(t, "/child", path)
-	assert.NoError(t, err)
-
-	conn.AssertExpectations(t)
-	dialer.AssertExpectations(t)
+	assert.Equal(s.T(), "/child", path)
+	assert.NoError(s.T(), err)
 }
