@@ -20,7 +20,7 @@ Curator.go users are assumed to know ZooKeeper. A good place to start is [ZooKee
 
 The Curator.go are available from [github.com](https://github.com/flier/curator.go). You can easily include Curator.go into your code.
 
-```
+``` 
 import (
 	"github.com/flier/curator.go"
 )
@@ -89,13 +89,13 @@ selector.Start()
 # Examples
 This module contains example usages of various Curator features. Each directory in the module is a separate example.
 
-- [/leader](tree/master/examples/leader) Example leader selector code 
-- [/cache](tree/master/examples/cache) Example PathChildrenCache usage
-- [/locking](tree/master/examples/locking) Example of using InterProcessMutex
-- [/discovery](tree/master/examples/discovery) Example usage of the Curator's ServiceDiscovery
-- [/framework](tree/master/examples/framework) A few examples of how to use the CuratorFramework class
+- [/leader](../../tree/master/examples/leader) Example leader selector code 
+- [/cache](../../tree/master/examples/cache) Example PathChildrenCache usage
+- [/locking](../../tree/master/examples/locking) Example of using InterProcessMutex
+- [/discovery](../../tree/master/examples/discovery) Example usage of the Curator's ServiceDiscovery
+- [/framework](../../tree/master/examples/framework) A few examples of how to use the CuratorFramework class
 
-See the [examples](tree/master/examples/) source repo for each example.
+See the [examples](../../tree/master/examples/) source repo for each example.
 
 # Recipes
 
@@ -105,9 +105,9 @@ TODO
 
 # Components
 
-- [Recipes](tree/master/doc/recipes.md) Implementations of some of the common ZooKeeper "recipes". The implementations are built on top of the Curator Framework.
-- [Framework](tree/master/doc/framework.md) The Curator Framework is a high-level API that greatly simplifies using ZooKeeper. It adds many features that build on ZooKeeper and handles the complexity of managing connections to the ZooKeeper cluster and retrying operations.
-- [Utilities](tree/master/doc/utilities.md) Various utilities that are useful when using ZooKeeper.
-- [Client](tree/master/doc/client.md) A replacement for the bundled ZooKeeper class that takes care of some low-level housekeeping and provides some useful utilities.
-- [Errors](tree/master/doc/errors.md) How Curator deals with errors, connection issues, recoverable exceptions, etc.
+- [Recipes](doc/recipes.md) Implementations of some of the common ZooKeeper "recipes". The implementations are built on top of the Curator Framework.
+- [Framework](doc/framework.md) The Curator Framework is a high-level API that greatly simplifies using ZooKeeper. It adds many features that build on ZooKeeper and handles the complexity of managing connections to the ZooKeeper cluster and retrying operations.
+- [Utilities](doc/utilities.md) Various utilities that are useful when using ZooKeeper.
+- [Client](doc/client.md) A replacement for the bundled ZooKeeper class that takes care of some low-level housekeeping and provides some useful utilities.
+- [Errors](doc/errors.md) How Curator deals with errors, connection issues, recoverable exceptions, etc.
 Extensions	The curator-recipes package implements the common recipes that are described in the ZooKeeper documentation. To avoid bloating that package, recipes/applications that have a vertical appeal will be put in separate "extension" packages using the naming convention curator-x-name.
