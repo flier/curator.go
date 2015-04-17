@@ -3,8 +3,6 @@ package curator
 import (
 	"fmt"
 	"time"
-
-	"github.com/samuel/go-zookeeper/zk"
 )
 
 type ConnectionState int32
@@ -34,7 +32,7 @@ type ZookeeperConnectionState struct {
 	tracer            TracerDriver
 	canReadOnly       bool
 	authInfos         []AuthInfo
-	conn              *zk.Conn
+	conn              ZookeeperConnection
 	parentWatchers    Watchers
 }
 
@@ -66,7 +64,7 @@ func (s *ZookeeperConnectionState) isConnected() bool {
 	return s.conn != nil
 }
 
-func (s *ZookeeperConnectionState) Conn() (*zk.Conn, error) {
+func (s *ZookeeperConnectionState) Conn() (ZookeeperConnection, error) {
 	if s.conn != nil {
 		return s.conn, nil
 	}

@@ -9,16 +9,48 @@ import (
 	"github.com/samuel/go-zookeeper/zk"
 )
 
+type ZookeeperConnection interface {
+	AddAuth(scheme string, auth []byte) error
+
+	Close()
+
+	Create(path string, data []byte, flags int32, acl []zk.ACL) (string, error)
+
+	Exists(path string) (bool, *zk.Stat, error)
+
+	ExistsW(path string) (bool, *zk.Stat, <-chan zk.Event, error)
+
+	Delete(path string, version int32) error
+
+	Get(path string) ([]byte, *zk.Stat, error)
+
+	GetW(path string) ([]byte, *zk.Stat, <-chan zk.Event, error)
+
+	Set(path string, data []byte, version int32) (*zk.Stat, error)
+
+	Children(path string) ([]string, *zk.Stat, error)
+
+	ChildrenW(path string) ([]string, *zk.Stat, <-chan zk.Event, error)
+
+	GetACL(path string) ([]zk.ACL, *zk.Stat, error)
+
+	SetACL(path string, acl []zk.ACL, version int32) (*zk.Stat, error)
+
+	Multi(ops ...interface{}) ([]zk.MultiResponse, error)
+
+	Sync(path string) (string, error)
+}
+
 // Allocate a new ZooKeeper connection
 type ZookeeperDialer interface {
-	Dial(connString string, sessionTimeout time.Duration, canBeReadOnly bool) (*zk.Conn, <-chan zk.Event, error)
+	Dial(connString string, sessionTimeout time.Duration, canBeReadOnly bool) (ZookeeperConnection, <-chan zk.Event, error)
 }
 
 type DefaultZookeeperDialer struct {
 	Dialer zk.Dialer
 }
 
-func (d *DefaultZookeeperDialer) Dial(connString string, sessionTimeout time.Duration, canBeReadOnly bool) (*zk.Conn, <-chan zk.Event, error) {
+func (d *DefaultZookeeperDialer) Dial(connString string, sessionTimeout time.Duration, canBeReadOnly bool) (ZookeeperConnection, <-chan zk.Event, error) {
 	return zk.ConnectWithDialer(strings.Split(connString, ","), sessionTimeout, d.Dialer)
 }
 
@@ -79,7 +111,7 @@ func (c *CuratorZookeeperClient) startTracer(name string) Tracer {
 	return newTimeTracer(name, c.TracerDriver)
 }
 
-func (c *CuratorZookeeperClient) Conn() (*zk.Conn, error) {
+func (c *CuratorZookeeperClient) Conn() (ZookeeperConnection, error) {
 	return c.state.Conn()
 }
 
