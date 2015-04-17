@@ -79,6 +79,12 @@ type CuratorFramework interface {
 	// Start a transaction builder
 	InTransaction() Transaction
 
+	// Perform a sync on the given path - syncs are always in the background
+	DoSync(path string, backgroundContextObject interface{})
+
+	//  Start a sync builder. Note: sync is ALWAYS in the background even if you don't use one of the background() methods
+	Sync() SyncBuilder
+
 	// Returns the listenable interface for the Connect State
 	ConnectionStateListenable() ConnectionStateListenable
 
@@ -272,6 +278,16 @@ func (c *curatorFramework) InTransaction() Transaction {
 	c.state.Check(STARTED, "instance must be started before calling this method")
 
 	return &curatorTransaction{client: c}
+}
+
+func (c *curatorFramework) DoSync(path string, context interface{}) {
+	c.Sync().InBackgroundWithContext(context).ForPath(path)
+}
+
+func (c *curatorFramework) Sync() SyncBuilder {
+	c.state.Check(STARTED, "instance must be started before calling this method")
+
+	return &syncBuilder{client: c}
 }
 
 func (c *curatorFramework) ConnectionStateListenable() ConnectionStateListenable {

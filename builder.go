@@ -272,6 +272,27 @@ type SetACLBuilder interface {
 	InBackgroundWithCallbackAndContext(callback BackgroundCallback, context interface{}) SetACLBuilder
 }
 
+type SyncBuilder interface {
+	// Pathable[T]
+	//
+	// Commit the currently building operation using the given path
+	ForPath(path string) (string, error)
+
+	// Backgroundable[T]
+	//
+	// Perform the action in the background
+	InBackground() SyncBuilder
+
+	// Perform the action in the background
+	InBackgroundWithContext(context interface{}) SyncBuilder
+
+	// Perform the action in the background
+	InBackgroundWithCallback(callback BackgroundCallback) SyncBuilder
+
+	// Perform the action in the background
+	InBackgroundWithCallbackAndContext(callback BackgroundCallback, context interface{}) SyncBuilder
+}
+
 type TransactionCreateBuilder interface {
 	// PathAndBytesable[T]
 	//
