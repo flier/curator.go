@@ -1,8 +1,6 @@
 package curator
 
 import (
-	"fmt"
-	"reflect"
 	"sync"
 )
 
@@ -66,17 +64,11 @@ func (l *unhandledErrorListenerStub) UnhandledError(err error) {
 
 // Abstracts a listenable object
 type Listenable /* [T] */ interface {
-	// Add the given listener.
-	AddListener(listener interface{} /* T */)
-
-	// Remove the given listener
-	RemoveListener(listener interface{} /* T */)
-
 	Len() int
 
 	Clear()
 
-	ForEach(fn interface{}, args ...interface{} /* T */) error
+	ForEach(callback func(interface{}))
 }
 
 type ConnectionStateListenable interface {
@@ -104,20 +96,14 @@ type UnhandledErrorListenable interface {
 }
 
 type listenerContainer struct {
-	lock      sync.Mutex
-	listeners map[interface{}][]reflect.Value
-}
-
-func newListenerContainer() *listenerContainer {
-	return &listenerContainer{
-		listeners: make(map[interface{}][]reflect.Value),
-	}
+	lock      sync.RWMutex
+	listeners []interface{}
 }
 
 func (c *listenerContainer) AddListener(listener interface{}) {
 	c.lock.Lock()
 
-	c.listeners[listener] = nil
+	c.listeners = append(c.listeners, listener)
 
 	c.lock.Unlock()
 }
@@ -125,7 +111,13 @@ func (c *listenerContainer) AddListener(listener interface{}) {
 func (c *listenerContainer) RemoveListener(listener interface{}) {
 	c.lock.Lock()
 
-	delete(c.listeners, listener)
+	for i, l := range c.listeners {
+		if l == listener {
+			copy(c.listeners[i:], c.listeners[i+1:])
+			c.listeners = c.listeners[:len(c.listeners)-1]
+			break
+		}
+	}
 
 	c.lock.Unlock()
 }
@@ -137,37 +129,23 @@ func (c *listenerContainer) Len() int {
 func (c *listenerContainer) Clear() {
 	c.lock.Lock()
 
-	c.listeners = make(map[interface{}][]reflect.Value)
+	c.listeners = nil
 
 	c.lock.Unlock()
 }
 
-func (c *listenerContainer) ForEach(fn interface{}, args ...interface{}) error {
-	v := reflect.ValueOf(fn)
+func (c *listenerContainer) ForEach(callback func(interface{})) {
+	c.lock.RLock()
 
-	if v.Kind() != reflect.Func {
-		return fmt.Errorf("`fn` should be a function, %s", fn)
+	for _, listener := range c.listeners {
+		callback(listener)
 	}
 
-	var opts []reflect.Value
-
-	for _, arg := range args {
-		opts = append(opts, reflect.ValueOf(arg))
-	}
-
-	for listener, _ := range c.listeners {
-		c.listeners[listener] = v.Call(append([]reflect.Value{reflect.ValueOf(listener)}, opts...))
-	}
-
-	return nil
+	c.lock.RUnlock()
 }
 
 type connectionStateListenerContainer struct {
 	*listenerContainer
-}
-
-func newConnectionStateListenerContainer() *connectionStateListenerContainer {
-	return &connectionStateListenerContainer{newListenerContainer()}
 }
 
 func (c *connectionStateListenerContainer) Add(listener ConnectionStateListener) {
@@ -182,10 +160,6 @@ type curatorListenerContainer struct {
 	*listenerContainer
 }
 
-func newCuratorListenerContainer() *curatorListenerContainer {
-	return &curatorListenerContainer{newListenerContainer()}
-}
-
 func (c *curatorListenerContainer) Add(listener CuratorListener) {
 	c.AddListener(listener)
 }
@@ -196,10 +170,6 @@ func (c *curatorListenerContainer) Remove(listener CuratorListener) {
 
 type unhandledErrorListenerContainer struct {
 	*listenerContainer
-}
-
-func newUnhandledErrorListenerContainer() *unhandledErrorListenerContainer {
-	return &unhandledErrorListenerContainer{newListenerContainer()}
 }
 
 func (c *unhandledErrorListenerContainer) Add(listener UnhandledErrorListener) {
