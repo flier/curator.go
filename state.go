@@ -1,6 +1,7 @@
 package curator
 
 import (
+	"errors"
 	"fmt"
 	"time"
 )
@@ -131,12 +132,15 @@ type connectionStateManager struct {
 	listeners              ConnectionStateListenable
 	state                  CuratorFrameworkState
 	currentConnectionState ConnectionState
+	events                 chan ConnectionState
+	QueueSize              int
 }
 
 func newConnectionStateManager(client CuratorFramework) *connectionStateManager {
 	return &connectionStateManager{
 		client:    client,
-		listeners: newConnectionStateListenerContainer(),
+		listeners: new(connectionStateListenerContainer),
+		QueueSize: 25,
 	}
 }
 
@@ -144,6 +148,10 @@ func (m *connectionStateManager) Start() error {
 	if !m.state.Change(LATENT, STARTED) {
 		return fmt.Errorf("Cannot be started more than once")
 	}
+
+	m.events = make(chan ConnectionState, m.QueueSize)
+
+	go m.processEvents()
 
 	return nil
 }
@@ -153,5 +161,63 @@ func (m *connectionStateManager) Close() error {
 		return nil
 	}
 
+	close(m.events)
+
 	return nil
+}
+
+func (m *connectionStateManager) processEvents() {
+	for {
+		if newState, ok := <-m.events; !ok {
+			return // queue closed
+		} else {
+			m.listeners.ForEach(func(listener interface{}) {
+				listener.(ConnectionStateListener).StateChanged(m.client, newState)
+			})
+		}
+	}
+}
+
+func (m *connectionStateManager) postState(state ConnectionState) {
+	for {
+		select {
+		case m.events <- state:
+			return
+		default:
+		}
+
+		select {
+		case <-m.events: // "ConnectionStateManager queue full - dropping events to make room"
+		default:
+		}
+	}
+}
+
+func (m *connectionStateManager) BlockUntilConnected(maxWaitTime time.Duration) error {
+	c := make(chan ConnectionState)
+
+	listener := NewConnectionStateListener(func(client CuratorFramework, newState ConnectionState) {
+		if newState.Connected() {
+			c <- newState
+		}
+	})
+
+	m.listeners.Add(listener)
+
+	defer m.listeners.Remove(listener)
+
+	if maxWaitTime > 0 {
+		timer := time.NewTimer(maxWaitTime)
+
+		select {
+		case <-c:
+			return nil
+		case <-timer.C:
+			return errors.New("timeout")
+		}
+	} else {
+		<-c
+
+		return nil
+	}
 }

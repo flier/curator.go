@@ -105,6 +105,12 @@ type CuratorFramework interface {
 
 	// Return the managed zookeeper client
 	ZookeeperClient() *CuratorZookeeperClient
+
+	// Block until a connection to ZooKeeper is available.
+	BlockUntilConnected() error
+
+	// Block until a connection to ZooKeeper is available or the maxWaitTime has been exceeded
+	BlockUntilConnectedTimeout(maxWaitTime time.Duration) error
 }
 
 // Create a new client with default session timeout and default connection timeout
@@ -173,8 +179,8 @@ type curatorFramework struct {
 
 func newCuratorFramework(b *CuratorFrameworkBuilder) *curatorFramework {
 	c := &curatorFramework{
-		listeners:               newCuratorListenerContainer(),
-		unhandledErrorListeners: newUnhandledErrorListenerContainer(),
+		listeners:               new(curatorListenerContainer),
+		unhandledErrorListeners: new(unhandledErrorListenerContainer),
 		defaultData:             b.DefaultData,
 		namespace:               b.Namespace,
 		retryPolicy:             b.RetryPolicy,
@@ -217,8 +223,8 @@ func (c *curatorFramework) Close() error {
 
 	evt := &curatorEvent{eventType: CLOSING}
 
-	c.listeners.ForEach(func(listener CuratorListener) error {
-		return listener.EventReceived(c, evt)
+	c.listeners.ForEach(func(listener interface{}) {
+		listener.(CuratorListener).EventReceived(c, evt)
 	})
 
 	c.listeners.Clear()
@@ -350,4 +356,12 @@ func (c *curatorFramework) getNamespaceWatcher(watcher Watcher) Watcher {
 
 func (c *curatorFramework) ZookeeperClient() *CuratorZookeeperClient {
 	return c.client
+}
+
+func (c *curatorFramework) BlockUntilConnected() error {
+	return c.BlockUntilConnectedTimeout(0)
+}
+
+func (c *curatorFramework) BlockUntilConnectedTimeout(maxWaitTime time.Duration) error {
+	return c.stateManager.BlockUntilConnected(maxWaitTime)
 }
