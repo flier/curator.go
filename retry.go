@@ -25,6 +25,8 @@ type RetryPolicy interface {
 type defaultRetrySleeper struct {
 }
 
+var DefaultRetrySleeper RetrySleeper = &defaultRetrySleeper{}
+
 func (s *defaultRetrySleeper) SleepFor(d time.Duration) error {
 	time.Sleep(d)
 
@@ -70,7 +72,7 @@ func (l *retryLoop) CallWithRetry(proc func() (interface{}, error)) (interface{}
 			l.retryCount++
 
 			if sleeper := l.retrySleeper; sleeper == nil {
-				sleeper = &defaultRetrySleeper{}
+				sleeper = DefaultRetrySleeper
 			} else {
 				if !l.retryPolicy.AllowRetry(l.retryCount, time.Now().Sub(l.startTime), sleeper) {
 					l.tracer.AddCount("retries-disallowed", 1)
