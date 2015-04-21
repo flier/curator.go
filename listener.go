@@ -74,25 +74,25 @@ type Listenable /* [T] */ interface {
 type ConnectionStateListenable interface {
 	Listenable /* [T] */
 
-	Add(listener ConnectionStateListener)
+	AddListener(listener ConnectionStateListener)
 
-	Remove(listener ConnectionStateListener)
+	RemoveListener(listener ConnectionStateListener)
 }
 
 type CuratorListenable interface {
 	Listenable /* [T] */
 
-	Add(listener CuratorListener)
+	AddListener(listener CuratorListener)
 
-	Remove(listener CuratorListener)
+	RemoveListener(listener CuratorListener)
 }
 
 type UnhandledErrorListenable interface {
 	Listenable /* [T] */
 
-	Add(listener UnhandledErrorListener)
+	AddListener(listener UnhandledErrorListener)
 
-	Remove(listener UnhandledErrorListener)
+	RemoveListener(listener UnhandledErrorListener)
 }
 
 type ListenerContainer struct {
@@ -100,7 +100,7 @@ type ListenerContainer struct {
 	listeners []interface{}
 }
 
-func (c *ListenerContainer) AddListener(listener interface{}) {
+func (c *ListenerContainer) Add(listener interface{}) {
 	c.lock.Lock()
 
 	c.listeners = append(c.listeners, listener)
@@ -108,7 +108,7 @@ func (c *ListenerContainer) AddListener(listener interface{}) {
 	c.lock.Unlock()
 }
 
-func (c *ListenerContainer) RemoveListener(listener interface{}) {
+func (c *ListenerContainer) Remove(listener interface{}) {
 	c.lock.Lock()
 
 	for i, l := range c.listeners {
@@ -148,34 +148,34 @@ type connectionStateListenerContainer struct {
 	*ListenerContainer
 }
 
-func (c *connectionStateListenerContainer) Add(listener ConnectionStateListener) {
-	c.AddListener(listener)
+func (c *connectionStateListenerContainer) AddListener(listener ConnectionStateListener) {
+	c.Add(listener)
 }
 
-func (c *connectionStateListenerContainer) Remove(listener ConnectionStateListener) {
-	c.RemoveListener(listener)
+func (c *connectionStateListenerContainer) RemoveListener(listener ConnectionStateListener) {
+	c.Remove(listener)
 }
 
 type curatorListenerContainer struct {
 	*ListenerContainer
 }
 
-func (c *curatorListenerContainer) Add(listener CuratorListener) {
-	c.AddListener(listener)
+func (c *curatorListenerContainer) AddListener(listener CuratorListener) {
+	c.Add(listener)
 }
 
-func (c *curatorListenerContainer) Remove(listener CuratorListener) {
-	c.RemoveListener(listener)
+func (c *curatorListenerContainer) RemoveListener(listener CuratorListener) {
+	c.Remove(listener)
 }
 
 type unhandledErrorListenerContainer struct {
 	*ListenerContainer
 }
 
-func (c *unhandledErrorListenerContainer) Add(listener UnhandledErrorListener) {
-	c.AddListener(listener)
+func (c *unhandledErrorListenerContainer) AddListener(listener UnhandledErrorListener) {
+	c.Add(listener)
 }
 
-func (c *unhandledErrorListenerContainer) Remove(listener UnhandledErrorListener) {
-	c.RemoveListener(listener)
+func (c *unhandledErrorListenerContainer) RemoveListener(listener UnhandledErrorListener) {
+	c.Remove(listener)
 }

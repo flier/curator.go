@@ -202,9 +202,9 @@ func (m *connectionStateManager) BlockUntilConnected(maxWaitTime time.Duration) 
 		}
 	})
 
-	m.listeners.Add(listener)
+	m.listeners.AddListener(listener)
 
-	defer m.listeners.Remove(listener)
+	defer m.listeners.RemoveListener(listener)
 
 	if maxWaitTime > 0 {
 		timer := time.NewTimer(maxWaitTime)

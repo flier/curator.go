@@ -45,9 +45,9 @@ type NodeCacheListener interface {
 type NodeCacheListenable interface {
 	curator.Listenable /* [T] */
 
-	Add(listener NodeCacheListener)
+	AddListener(listener NodeCacheListener)
 
-	Remove(listener NodeCacheListener)
+	RemoveListener(listener NodeCacheListener)
 }
 
 // Listener for PathChildrenCache changes
@@ -66,12 +66,12 @@ type NodeCacheListenerContainer struct {
 	*curator.ListenerContainer
 }
 
-func (c *NodeCacheListenerContainer) Add(listener NodeCacheListener) {
-	c.AddListener(listener)
+func (c *NodeCacheListenerContainer) AddListener(listener NodeCacheListener) {
+	c.Add(listener)
 }
 
-func (c *NodeCacheListenerContainer) Remove(listener NodeCacheListener) {
-	c.RemoveListener(listener)
+func (c *NodeCacheListenerContainer) RemoveListener(listener NodeCacheListener) {
+	c.Remove(listener)
 }
 
 // A utility that attempts to keep the data from a node locally cached.
@@ -122,7 +122,7 @@ func (c *NodeCache) StartAndInitalize(buildInitial bool) error {
 		return fmt.Errorf("Cannot be started more than once")
 	}
 
-	c.client.ConnectionStateListenable().Add(c.connectionStateListener)
+	c.client.ConnectionStateListenable().AddListener(c.connectionStateListener)
 
 	if buildInitial {
 		if err := c.internalRebuild(); err != nil {
@@ -138,7 +138,7 @@ func (c *NodeCache) Close() error {
 
 	}
 
-	c.client.ConnectionStateListenable().Remove(c.connectionStateListener)
+	c.client.ConnectionStateListenable().RemoveListener(c.connectionStateListener)
 
 	return nil
 }
