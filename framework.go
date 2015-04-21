@@ -106,6 +106,9 @@ type CuratorFramework interface {
 	// Return the managed zookeeper client
 	ZookeeperClient() *CuratorZookeeperClient
 
+	// Allocates an ensure path instance that is namespace aware
+	NewNamespaceAwareEnsurePath(path string) EnsurePath
+
 	// Block until a connection to ZooKeeper is available.
 	BlockUntilConnected() error
 
@@ -356,6 +359,10 @@ func (c *curatorFramework) getNamespaceWatcher(watcher Watcher) Watcher {
 
 func (c *curatorFramework) ZookeeperClient() *CuratorZookeeperClient {
 	return c.client
+}
+
+func (c *curatorFramework) NewNamespaceAwareEnsurePath(path string) EnsurePath {
+	return NewEnsurePathWithAcl(c.fixForNamespace(path, false), c.aclProvider)
 }
 
 func (c *curatorFramework) BlockUntilConnected() error {

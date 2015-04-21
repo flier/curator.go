@@ -1,6 +1,7 @@
 package curator
 
 import (
+	"sync"
 	"sync/atomic"
 	"unsafe"
 
@@ -57,3 +58,95 @@ func (b *AtomicBool) Swap(v bool) bool {
 }
 
 func (b *AtomicBool) Set(v bool) { b.Swap(v) }
+
+type EnsurePath interface {
+	// First time, synchronizes and makes sure all nodes in the path are created.
+	// Subsequent calls with this instance are NOPs.
+	Ensure(client *CuratorZookeeperClient) error
+
+	// Returns a view of this EnsurePath instance that does not make the last node.
+	ExcludingLast() EnsurePath
+}
+
+type EnsurePathHelper interface {
+	Ensure(client *CuratorZookeeperClient, path string, makeLastNode bool) error
+}
+
+type ensurePathHelper struct {
+	owner   *ensurePath
+	lock    sync.Mutex
+	started bool
+}
+
+func (h *ensurePathHelper) Ensure(client *CuratorZookeeperClient, path string, makeLastNode bool) error {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+
+	if !h.started {
+		_, err := client.newRetryLoop().CallWithRetry(func() (interface{}, error) {
+			if conn, err := client.Conn(); err != nil {
+				return nil, err
+			} else if err := MakeDirs(conn, h.owner.path, h.owner.makeLastNode, h.owner.aclProvider); err != nil {
+				return nil, err
+			} else {
+				return nil, nil
+			}
+		})
+
+		h.owner.helper.Store(nil)
+
+		h.started = true
+
+		return err
+	}
+
+	return nil
+}
+
+// Utility to ensure that a particular path is created.
+type ensurePath struct {
+	path         string
+	aclProvider  ACLProvider
+	makeLastNode bool
+	helper       atomic.Value
+}
+
+func NewEnsurePath(path string) *ensurePath {
+	return NewEnsurePathWithAclAndHelper(path, nil, nil)
+}
+
+func NewEnsurePathWithAcl(path string, aclProvider ACLProvider) *ensurePath {
+	return NewEnsurePathWithAclAndHelper(path, aclProvider, nil)
+}
+
+func NewEnsurePathWithAclAndHelper(path string, aclProvider ACLProvider, helper EnsurePathHelper) *ensurePath {
+	p := &ensurePath{
+		path:         path,
+		aclProvider:  aclProvider,
+		makeLastNode: true,
+	}
+
+	if helper == nil {
+		p.helper.Store(&ensurePathHelper{owner: p})
+	} else {
+		p.helper.Store(helper)
+	}
+
+	return p
+}
+
+func (p *ensurePath) ExcludingLast() EnsurePath {
+	return &ensurePath{
+		path:         p.path,
+		aclProvider:  p.aclProvider,
+		makeLastNode: false,
+	}
+}
+
+func (p *ensurePath) Ensure(client *CuratorZookeeperClient) error {
+	if helper := p.helper.Load(); helper != nil {
+		return helper.(EnsurePathHelper).Ensure(client, p.path, p.makeLastNode)
+	}
+
+	return nil
+}

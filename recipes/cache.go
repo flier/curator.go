@@ -81,6 +81,7 @@ type NodeCache struct {
 	client                  curator.CuratorFramework
 	path                    string
 	compressed              bool
+	ensurePath              curator.EnsurePath
 	state                   curator.State
 	isConnected             curator.AtomicBool
 	data                    *ChildData
@@ -95,6 +96,7 @@ func NewNodeCache(client curator.CuratorFramework, path string, compressed bool)
 		client:     client,
 		path:       path,
 		compressed: compressed,
+		ensurePath: client.NewNamespaceAwareEnsurePath(path).ExcludingLast(),
 		listeners:  &NodeCacheListenerContainer{},
 	}
 
@@ -130,6 +132,8 @@ func (c *NodeCache) Start() error {
 func (c *NodeCache) StartAndInitalize(buildInitial bool) error {
 	if !c.state.Change(curator.LATENT, curator.STARTED) {
 		return fmt.Errorf("Cannot be started more than once")
+	} else if err := c.ensurePath.Ensure(c.client.ZookeeperClient()); err != nil {
+		return err
 	}
 
 	c.client.ConnectionStateListenable().AddListener(c.connectionStateListener)
