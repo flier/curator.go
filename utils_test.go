@@ -33,3 +33,23 @@ func TestCloseQuietly(t *testing.T) {
 
 	c.AssertNotCalled(t, "Close")
 }
+
+func TestAtomicBool(t *testing.T) {
+	var b AtomicBool
+
+	assert.False(t, b.Load())
+
+	b = NewAtomicBool(true)
+
+	assert.True(t, b.Load())
+
+	assert.False(t, b.CompareAndSwap(false, true))
+
+	assert.True(t, b.Swap(false))
+
+	assert.False(t, b.Load())
+
+	assert.True(t, b.CompareAndSwap(false, true))
+
+	assert.True(t, b.Load())
+}

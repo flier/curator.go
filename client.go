@@ -80,7 +80,7 @@ type CuratorZookeeperClient struct {
 	state             *ZookeeperConnectionState
 	connectionTimeout time.Duration
 	watcher           Watcher
-	started           bool
+	started           AtomicBool
 	TracerDriver      TracerDriver
 	RetryPolicy       RetryPolicy
 }
@@ -103,7 +103,7 @@ func NewCuratorZookeeperClient(zookeeperDialer ZookeeperDialer, ensembleProvider
 }
 
 func (c *CuratorZookeeperClient) Start() error {
-	if c.started {
+	if !c.started.CompareAndSwap(false, true) {
 		return errors.New("Already started")
 	}
 
@@ -111,7 +111,7 @@ func (c *CuratorZookeeperClient) Start() error {
 }
 
 func (c *CuratorZookeeperClient) Close() error {
-	c.started = false
+	c.started.Set(false)
 
 	return c.state.Close()
 }
@@ -134,12 +134,16 @@ func (c *CuratorZookeeperClient) startTracer(name string) Tracer {
 }
 
 func (c *CuratorZookeeperClient) Conn() (ZookeeperConnection, error) {
+	if !c.started.Load() {
+		return nil, errors.New("Client is not started")
+	}
+
 	return c.state.Conn()
 }
 
 // This method blocks until the connection to ZK succeeds.
 func (c *CuratorZookeeperClient) BlockUntilConnectedOrTimedOut() error {
-	if !c.started {
+	if !c.started.Load() {
 		return errors.New("Client is not started")
 	}
 

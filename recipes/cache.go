@@ -82,7 +82,7 @@ type NodeCache struct {
 	path                    string
 	compressed              bool
 	state                   curator.State
-	isConnected             bool
+	isConnected             curator.AtomicBool
 	data                    *ChildData
 	connectionStateListener curator.ConnectionStateListener
 	watcher                 curator.Watcher
@@ -95,15 +95,25 @@ func NewNodeCache(client curator.CuratorFramework, path string, compressed bool)
 		client:     client,
 		path:       path,
 		compressed: compressed,
-		connectionStateListener: curator.NewConnectionStateListener(func(client curator.CuratorFramework, newState curator.ConnectionState) {
-
-		}),
-		listeners: &NodeCacheListenerContainer{},
+		listeners:  &NodeCacheListenerContainer{},
 	}
+
+	c.connectionStateListener = curator.NewConnectionStateListener(func(client curator.CuratorFramework, newState curator.ConnectionState) {
+		if newState.Connected() {
+			if c.isConnected.CompareAndSwap(false, true) {
+				if err := c.reset(); err != nil {
+					panic(fmt.Errorf("Trying to reset after reconnection, %s", err))
+				}
+			}
+		} else {
+			c.isConnected.Set(false)
+		}
+	})
 
 	c.watcher = curator.NewWatcher(func(event *zk.Event) {
 		c.reset()
 	})
+
 	c.backgroundCallback = func(client curator.CuratorFramework, event curator.CuratorEvent) error {
 		return c.processBackgroundResult(event)
 	}
@@ -168,7 +178,7 @@ func (c *NodeCache) internalRebuild() error {
 }
 
 func (c *NodeCache) reset() error {
-	if c.state.Value() == curator.STARTED && c.isConnected {
+	if c.state.Value() == curator.STARTED && c.isConnected.Load() {
 		_, err := c.client.CheckExists().UsingWatcher(c.watcher).InBackgroundWithCallback(c.backgroundCallback).ForPath(c.path)
 
 		return err
