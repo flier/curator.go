@@ -9,23 +9,23 @@ import (
 	"github.com/samuel/go-zookeeper/zk"
 )
 
-type CuratorFrameworkState int32
+type State int32
 
 const (
-	LATENT  CuratorFrameworkState = iota // CuratorFramework.Start() has not yet been called
-	STARTED                              // CuratorFramework.Start() has been called
-	STOPPED                              // CuratorFramework.Close() has been called
+	LATENT  State = iota // Start() has not yet been called
+	STARTED              // Start() has been called
+	STOPPED              // Close() has been called
 )
 
-func (s *CuratorFrameworkState) Change(oldState, newState CuratorFrameworkState) bool {
+func (s *State) Change(oldState, newState State) bool {
 	return atomic.CompareAndSwapInt32((*int32)(s), int32(oldState), int32(newState))
 }
 
-func (s *CuratorFrameworkState) Value() CuratorFrameworkState {
-	return CuratorFrameworkState(atomic.LoadInt32((*int32)(s)))
+func (s *State) Value() State {
+	return State(atomic.LoadInt32((*int32)(s)))
 }
 
-func (s CuratorFrameworkState) Check(state CuratorFrameworkState, msg string) {
+func (s State) Check(state State, msg string) {
 	if s != state {
 		panic(msg)
 	}
@@ -46,7 +46,7 @@ type CuratorFramework interface {
 	Close() error
 
 	// Returns the state of this instance
-	State() CuratorFrameworkState
+	State() State
 
 	// Return true if the client is started, not closed, etc.
 	Started() bool
@@ -167,7 +167,7 @@ type curatorFramework struct {
 	client                  *CuratorZookeeperClient
 	stateManager            *connectionStateManager
 	namespaceFacadeCache    *namespaceFacadeCache
-	state                   CuratorFrameworkState
+	state                   State
 	listeners               CuratorListenable
 	unhandledErrorListeners UnhandledErrorListenable
 	defaultData             []byte
@@ -237,7 +237,7 @@ func (c *curatorFramework) Close() error {
 	return c.client.Close()
 }
 
-func (c *curatorFramework) State() CuratorFrameworkState {
+func (c *curatorFramework) State() State {
 	return c.state.Value()
 }
 

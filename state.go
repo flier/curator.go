@@ -130,7 +130,7 @@ func (s *ZookeeperConnectionState) removeParentWatcher(watcher Watcher) Watcher 
 type connectionStateManager struct {
 	client                 CuratorFramework
 	listeners              ConnectionStateListenable
-	state                  CuratorFrameworkState
+	state                  State
 	currentConnectionState ConnectionState
 	events                 chan ConnectionState
 	QueueSize              int
