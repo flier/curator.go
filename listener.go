@@ -95,12 +95,12 @@ type UnhandledErrorListenable interface {
 	Remove(listener UnhandledErrorListener)
 }
 
-type listenerContainer struct {
+type ListenerContainer struct {
 	lock      sync.RWMutex
 	listeners []interface{}
 }
 
-func (c *listenerContainer) AddListener(listener interface{}) {
+func (c *ListenerContainer) AddListener(listener interface{}) {
 	c.lock.Lock()
 
 	c.listeners = append(c.listeners, listener)
@@ -108,7 +108,7 @@ func (c *listenerContainer) AddListener(listener interface{}) {
 	c.lock.Unlock()
 }
 
-func (c *listenerContainer) RemoveListener(listener interface{}) {
+func (c *ListenerContainer) RemoveListener(listener interface{}) {
 	c.lock.Lock()
 
 	for i, l := range c.listeners {
@@ -122,11 +122,11 @@ func (c *listenerContainer) RemoveListener(listener interface{}) {
 	c.lock.Unlock()
 }
 
-func (c *listenerContainer) Len() int {
+func (c *ListenerContainer) Len() int {
 	return len(c.listeners)
 }
 
-func (c *listenerContainer) Clear() {
+func (c *ListenerContainer) Clear() {
 	c.lock.Lock()
 
 	c.listeners = nil
@@ -134,7 +134,7 @@ func (c *listenerContainer) Clear() {
 	c.lock.Unlock()
 }
 
-func (c *listenerContainer) ForEach(callback func(interface{})) {
+func (c *ListenerContainer) ForEach(callback func(interface{})) {
 	c.lock.RLock()
 
 	for _, listener := range c.listeners {
@@ -145,7 +145,7 @@ func (c *listenerContainer) ForEach(callback func(interface{})) {
 }
 
 type connectionStateListenerContainer struct {
-	*listenerContainer
+	*ListenerContainer
 }
 
 func (c *connectionStateListenerContainer) Add(listener ConnectionStateListener) {
@@ -157,7 +157,7 @@ func (c *connectionStateListenerContainer) Remove(listener ConnectionStateListen
 }
 
 type curatorListenerContainer struct {
-	*listenerContainer
+	*ListenerContainer
 }
 
 func (c *curatorListenerContainer) Add(listener CuratorListener) {
@@ -169,7 +169,7 @@ func (c *curatorListenerContainer) Remove(listener CuratorListener) {
 }
 
 type unhandledErrorListenerContainer struct {
-	*listenerContainer
+	*ListenerContainer
 }
 
 func (c *unhandledErrorListenerContainer) Add(listener UnhandledErrorListener) {
