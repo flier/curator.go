@@ -4,6 +4,15 @@ import (
 	"bytes"
 	"compress/gzip"
 	"io/ioutil"
+
+	"github.com/bkaradzic/go-lz4"
+)
+
+var (
+	CompressionProviders = map[string]CompressionProvider{
+		"gzip": NewGzipCompressionProvider(),
+		"lz4":  NewLZ4CompressionProvider(),
+	}
 )
 
 type CompressionProvider interface {
@@ -48,4 +57,18 @@ func (c *GzipCompressionProvider) Decompress(path string, compressedData []byte)
 	} else {
 		return data, err
 	}
+}
+
+type LZ4CompressionProvider struct{}
+
+func NewLZ4CompressionProvider() *LZ4CompressionProvider {
+	return &LZ4CompressionProvider{}
+}
+
+func (c *LZ4CompressionProvider) Compress(path string, data []byte) ([]byte, error) {
+	return lz4.Encode(nil, data)
+}
+
+func (c *LZ4CompressionProvider) Decompress(path string, compressedData []byte) ([]byte, error) {
+	return lz4.Decode(nil, compressedData)
 }
