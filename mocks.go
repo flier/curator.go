@@ -214,7 +214,7 @@ func (d *mockZookeeperDialer) Dial(connString string, sessionTimeout time.Durati
 	err := args.Error(2)
 
 	if d.log != nil {
-		d.log("Dial(\"%s\", %v, %v)(%p, %v, %v)", connString, sessionTimeout, canBeReadOnly, conn, events, err)
+		d.log("Dial(connectString=\"%s\", sessionTimeout=%v, canBeReadOnly=%v)(conn=%p, events=%v, error=%v)", connString, sessionTimeout, canBeReadOnly, conn, events, err)
 	}
 
 	return conn, events, err
@@ -233,7 +233,7 @@ func (p *mockCompressionProvider) Compress(path string, data []byte) ([]byte, er
 	err := args.Error(1)
 
 	if p.log != nil {
-		p.log("Compress(\"%s\", []byte(\"%s\"))([]byte(\"%s\"), %v)", path, data, compressedData, err)
+		p.log("Compress(path=\"%s\", data=[]byte(\"%s\"))(compressedData=[]byte(\"%s\"), error=%v)", path, data, compressedData, err)
 	}
 
 	return compressedData, err
@@ -246,7 +246,7 @@ func (p *mockCompressionProvider) Decompress(path string, compressedData []byte)
 	err := args.Error(1)
 
 	if p.log != nil {
-		p.log("Decompress(\"%s\", []byte(\"%s\"))([]byte(\"%s\"), %v)", path, compressedData, data, err)
+		p.log("Decompress(path=\"%s\", compressedData=[]byte(\"%s\"))(data=[]byte(\"%s\"), error=%v)", path, compressedData, data, err)
 	}
 
 	return data, err

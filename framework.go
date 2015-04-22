@@ -32,8 +32,9 @@ func (s State) Check(state State, msg string) {
 }
 
 const (
-	DEFAULT_SESSION_TIMEOUT    time.Duration = 60 * time.Second
-	DEFAULT_CONNECTION_TIMEOUT               = 15 * time.Second
+	DEFAULT_SESSION_TIMEOUT    = 60 * time.Second
+	DEFAULT_CONNECTION_TIMEOUT = 15 * time.Second
+	DEFAULT_CLOSE_WAIT         = 1 * time.Second
 )
 
 // Zookeeper framework-style client
@@ -149,7 +150,25 @@ type CuratorFrameworkBuilder struct {
 
 // Apply the current values and build a new CuratorFramework
 func (b *CuratorFrameworkBuilder) Build() CuratorFramework {
-	return newCuratorFramework(b)
+	builder := *b
+
+	if builder.SessionTimeout == 0 {
+		builder.SessionTimeout = DEFAULT_SESSION_TIMEOUT
+	}
+	if builder.ConnectionTimeout == 0 {
+		builder.ConnectionTimeout = DEFAULT_CONNECTION_TIMEOUT
+	}
+	if builder.MaxCloseWait == 0 {
+		builder.MaxCloseWait = DEFAULT_CLOSE_WAIT
+	}
+	if builder.CompressionProvider == nil {
+		builder.CompressionProvider = NewGzipCompressionProvider()
+	}
+	if builder.AclProvider == nil {
+		builder.AclProvider = NewDefaultACLProvider()
+	}
+
+	return newCuratorFramework(&builder)
 }
 
 // Set the list of servers to connect to.

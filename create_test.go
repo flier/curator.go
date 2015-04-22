@@ -39,7 +39,7 @@ func (s *CreateBuilderTestSuite) SetupTest() {
 	s.events = make(chan zk.Event)
 
 	s.conn.On("Close").Return().Once()
-	s.dialer.On("Dial", s.builder.EnsembleProvider.ConnectionString(), s.builder.ConnectionTimeout, s.builder.CanBeReadOnly).Return(s.conn, s.events, nil).Once()
+	s.dialer.On("Dial", s.builder.EnsembleProvider.ConnectionString(), DEFAULT_CONNECTION_TIMEOUT, s.builder.CanBeReadOnly).Return(s.conn, s.events, nil).Once()
 }
 
 func (s *CreateBuilderTestSuite) TearDownTest() {
