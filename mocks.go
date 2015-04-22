@@ -43,18 +43,47 @@ func (t *mockTracerDriver) AddCount(name string, increment int) {
 
 type mockRetrySleeper struct {
 	mock.Mock
+
+	log infof
 }
 
 func (s *mockRetrySleeper) SleepFor(time time.Duration) error {
 	return s.Called(time).Error(0)
 }
 
+type mockRetryPolicy struct {
+	mock.Mock
+
+	log infof
+}
+
+func (r *mockRetryPolicy) AllowRetry(retryCount int, elapsedTime time.Duration, sleeper RetrySleeper) bool {
+	args := r.Called(retryCount, elapsedTime, sleeper)
+
+	allow := args.Bool(0)
+
+	if r.log != nil {
+		r.log("AllowRetry(retryCount=%d, elapsedTime=%v, sleeper=%p) allow=%v", retryCount, elapsedTime, sleeper, allow)
+	}
+
+	return allow
+}
+
+type mockEnsembleProvider struct {
+	mock.Mock
+}
+
+func (p *mockEnsembleProvider) Start() error { return p.Called().Error(0) }
+
+func (p *mockEnsembleProvider) Close() error { return p.Called().Error(0) }
+
+func (p *mockEnsembleProvider) ConnectionString() string { return p.Called().String(0) }
+
 type mockConn struct {
 	mock.Mock
 
+	log        infof
 	operations []interface{}
-
-	log infof
 }
 
 func (c *mockConn) AddAuth(scheme string, auth []byte) error {
@@ -283,13 +312,17 @@ type mockACLProvider struct {
 func (p *mockACLProvider) GetDefaultAcl() []zk.ACL {
 	args := p.Called()
 
-	return args.Get(0).([]zk.ACL)
+	acls, _ := args.Get(0).([]zk.ACL)
+
+	return acls
 }
 
 func (p *mockACLProvider) GetAclForPath(path string) []zk.ACL {
 	args := p.Called(path)
 
-	return args.Get(0).([]zk.ACL)
+	acls, _ := args.Get(0).([]zk.ACL)
+
+	return acls
 }
 
 type mockEnsurePath struct {
@@ -341,29 +374,22 @@ func (h *mockEnsurePathHelper) Ensure(client *CuratorZookeeperClient, path strin
 }
 
 type mockZookeeperClient struct {
-	conn     *mockConn
-	dialer   *mockZookeeperDialer
-	compress *mockCompressionProvider
-	builder  *CuratorFrameworkBuilder
-	events   chan zk.Event
-	wg       sync.WaitGroup
+	builder *CuratorFrameworkBuilder
 }
 
 func newMockZookeeperClient() *mockZookeeperClient {
-	c := &mockZookeeperClient{
-		conn:     &mockConn{},
-		dialer:   &mockZookeeperDialer{},
-		compress: &mockCompressionProvider{},
-		events:   make(chan zk.Event),
+	return &mockZookeeperClient{
+		builder: &CuratorFrameworkBuilder{
+			SessionTimeout:    DEFAULT_SESSION_TIMEOUT,
+			ConnectionTimeout: DEFAULT_CONNECTION_TIMEOUT,
+			MaxCloseWait:      DEFAULT_CLOSE_WAIT,
+			DefaultData:       []byte("default"),
+		},
 	}
+}
 
-	c.builder = &CuratorFrameworkBuilder{
-		ZookeeperDialer:     c.dialer,
-		EnsembleProvider:    &fixedEnsembleProvider{"connectString"},
-		CompressionProvider: c.compress,
-		RetryPolicy:         NewRetryOneTime(0),
-		DefaultData:         []byte("default"),
-	}
+func (c *mockZookeeperClient) Prepare(callback func(builder *CuratorFrameworkBuilder)) *mockZookeeperClient {
+	callback(c.builder)
 
 	return c
 }
@@ -375,15 +401,36 @@ func (c *mockZookeeperClient) WithNamespace(namespace string) *mockZookeeperClie
 }
 
 func (c *mockZookeeperClient) Test(t *testing.T, callback interface{}) {
-	c.conn.log = t.Logf
-	c.dialer.log = t.Logf
-	c.compress.log = t.Logf
+	var client CuratorFramework
+	var events chan zk.Event
+	var wg *sync.WaitGroup
 
-	client := c.builder.Build()
+	zookeeperConnection := &mockConn{log: t.Logf}
+	zookeeperDialer := &mockZookeeperDialer{log: t.Logf}
+	ensembleProvider := &mockEnsembleProvider{}
+	compressionProvider := &mockCompressionProvider{log: t.Logf}
+	retryPolicy := &mockRetryPolicy{log: t.Logf}
+	aclProvider := &mockACLProvider{}
 
-	c.dialer.On("Dial", c.builder.EnsembleProvider.ConnectionString(), DEFAULT_CONNECTION_TIMEOUT, c.builder.CanBeReadOnly).Return(c.conn, c.events, nil).Once()
+	if c.builder.ZookeeperDialer == nil {
+		c.builder.ZookeeperDialer = zookeeperDialer
+	}
 
-	assert.NoError(t, client.Start())
+	if c.builder.EnsembleProvider == nil {
+		c.builder.EnsembleProvider = ensembleProvider
+	}
+
+	if c.builder.CompressionProvider == nil {
+		c.builder.CompressionProvider = compressionProvider
+	}
+
+	if c.builder.RetryPolicy == nil {
+		c.builder.RetryPolicy = retryPolicy
+	}
+
+	if c.builder.AclProvider == nil {
+		c.builder.AclProvider = aclProvider
+	}
 
 	fn := reflect.TypeOf(callback)
 
@@ -391,53 +438,88 @@ func (c *mockZookeeperClient) Test(t *testing.T, callback interface{}) {
 
 	args := make([]reflect.Value, fn.NumIn())
 
-	waiting := false
-
 	for i := 0; i < fn.NumIn(); i++ {
 		switch argType := fn.In(i); argType {
 		case reflect.TypeOf(c.builder):
 			args[i] = reflect.ValueOf(c.builder)
 
 		case reflect.TypeOf((*CuratorFramework)(nil)).Elem():
+			client = c.builder.Build()
 			args[i] = reflect.ValueOf(client)
 
-		case reflect.TypeOf((*ZookeeperConnection)(nil)).Elem(), reflect.TypeOf(c.conn):
-			args[i] = reflect.ValueOf(c.conn)
+		case reflect.TypeOf((*ZookeeperConnection)(nil)).Elem(), reflect.TypeOf(zookeeperConnection):
+			args[i] = reflect.ValueOf(zookeeperConnection)
 
-		case reflect.TypeOf((*ZookeeperDialer)(nil)).Elem(), reflect.TypeOf(c.dialer):
-			args[i] = reflect.ValueOf(c.dialer)
+		case reflect.TypeOf((*ZookeeperDialer)(nil)).Elem(), reflect.TypeOf(zookeeperDialer):
+			args[i] = reflect.ValueOf(zookeeperDialer)
 
-		case reflect.TypeOf((*ZookeeperDialer)(nil)).Elem(), reflect.TypeOf(c.compress):
-			args[i] = reflect.ValueOf(c.compress)
+		case reflect.TypeOf((*EnsembleProvider)(nil)).Elem(), reflect.TypeOf(ensembleProvider):
+			args[i] = reflect.ValueOf(ensembleProvider)
 
-		case reflect.TypeOf(c.events):
-			args[i] = reflect.ValueOf(c.events)
+		case reflect.TypeOf((*ZookeeperDialer)(nil)).Elem(), reflect.TypeOf(compressionProvider):
+			args[i] = reflect.ValueOf(compressionProvider)
 
-		case reflect.TypeOf(&c.wg):
-			args[i] = reflect.ValueOf(&c.wg)
-			c.wg.Add(1)
-			waiting = true
+		case reflect.TypeOf((*RetryPolicy)(nil)).Elem(), reflect.TypeOf(retryPolicy):
+			args[i] = reflect.ValueOf(retryPolicy)
+
+		case reflect.TypeOf((*ACLProvider)(nil)).Elem(), reflect.TypeOf(aclProvider):
+			args[i] = reflect.ValueOf(aclProvider)
+
+		case reflect.TypeOf(events):
+			events = make(chan zk.Event)
+			args[i] = reflect.ValueOf(events)
+
+		case reflect.TypeOf(wg):
+			wg = new(sync.WaitGroup)
+			args[i] = reflect.ValueOf(wg)
 
 		default:
 			t.Errorf("unknown arg type: %s", fn.In(i))
 		}
 	}
 
-	reflect.ValueOf(callback).Call(args)
+	if client != nil {
+		if c.builder.EnsembleProvider == ensembleProvider {
+			ensembleProvider.On("ConnectionString").Return("connStr").Once()
+			ensembleProvider.On("Start").Return(nil).Once()
+			ensembleProvider.On("Close").Return(nil).Once()
+		}
 
-	if waiting {
-		c.wg.Wait()
+		if c.builder.ZookeeperDialer == zookeeperDialer {
+			zookeeperDialer.On("Dial", mock.AnythingOfType("string"), c.builder.ConnectionTimeout, c.builder.CanBeReadOnly).Return(zookeeperConnection, events, nil).Once()
+		}
+
+		assert.NoError(t, client.Start())
 	}
 
-	c.conn.On("Close").Return().Once()
+	if wg != nil {
+		wg.Add(1)
+	}
 
-	assert.NoError(t, client.Close())
+	reflect.ValueOf(callback).Call(args)
 
-	close(c.events)
+	if wg != nil {
+		wg.Wait()
+	}
 
-	c.conn.AssertExpectations(t)
-	c.dialer.AssertExpectations(t)
-	c.compress.AssertExpectations(t)
+	if client != nil {
+		if c.builder.ZookeeperDialer == zookeeperDialer {
+			zookeeperConnection.On("Close").Return().Once()
+		}
+
+		assert.NoError(t, client.Close())
+	}
+
+	if events != nil {
+		close(events)
+	}
+
+	zookeeperConnection.AssertExpectations(t)
+	zookeeperDialer.AssertExpectations(t)
+	ensembleProvider.AssertExpectations(t)
+	compressionProvider.AssertExpectations(t)
+	retryPolicy.AssertExpectations(t)
+	aclProvider.AssertExpectations(t)
 }
 
 type mockClientTestSuite struct {
