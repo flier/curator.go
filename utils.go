@@ -86,16 +86,16 @@ func (h *ensurePathHelper) Ensure(client *CuratorZookeeperClient, path string, m
 		_, err := client.newRetryLoop().CallWithRetry(func() (interface{}, error) {
 			if conn, err := client.Conn(); err != nil {
 				return nil, err
-			} else if err := MakeDirs(conn, h.owner.path, h.owner.makeLastNode, h.owner.aclProvider); err != nil {
+			} else if err := MakeDirs(conn, path, makeLastNode, h.owner.aclProvider); err != nil {
 				return nil, err
 			} else {
 				return nil, nil
 			}
 		})
 
-		h.owner.helper.Store(nil)
-
 		h.started = true
+
+		h.owner.helper = nil
 
 		return err
 	}
@@ -108,7 +108,7 @@ type ensurePath struct {
 	path         string
 	aclProvider  ACLProvider
 	makeLastNode bool
-	helper       atomic.Value
+	helper       EnsurePathHelper
 }
 
 func NewEnsurePath(path string) *ensurePath {
@@ -127,9 +127,9 @@ func NewEnsurePathWithAclAndHelper(path string, aclProvider ACLProvider, helper 
 	}
 
 	if helper == nil {
-		p.helper.Store(&ensurePathHelper{owner: p})
+		p.helper = &ensurePathHelper{owner: p}
 	} else {
-		p.helper.Store(helper)
+		p.helper = helper
 	}
 
 	return p
@@ -144,8 +144,8 @@ func (p *ensurePath) ExcludingLast() EnsurePath {
 }
 
 func (p *ensurePath) Ensure(client *CuratorZookeeperClient) error {
-	if helper := p.helper.Load(); helper != nil {
-		return helper.(EnsurePathHelper).Ensure(client, p.path, p.makeLastNode)
+	if p.helper != nil {
+		return p.helper.Ensure(client, p.path, p.makeLastNode)
 	}
 
 	return nil

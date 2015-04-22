@@ -145,7 +145,7 @@ func (c *ListenerContainer) ForEach(callback func(interface{})) {
 }
 
 type connectionStateListenerContainer struct {
-	*ListenerContainer
+	ListenerContainer
 }
 
 func (c *connectionStateListenerContainer) AddListener(listener ConnectionStateListener) {
@@ -157,7 +157,7 @@ func (c *connectionStateListenerContainer) RemoveListener(listener ConnectionSta
 }
 
 type curatorListenerContainer struct {
-	*ListenerContainer
+	ListenerContainer
 }
 
 func (c *curatorListenerContainer) AddListener(listener CuratorListener) {
@@ -169,7 +169,7 @@ func (c *curatorListenerContainer) RemoveListener(listener CuratorListener) {
 }
 
 type unhandledErrorListenerContainer struct {
-	*ListenerContainer
+	ListenerContainer
 }
 
 func (c *unhandledErrorListenerContainer) AddListener(listener UnhandledErrorListener) {

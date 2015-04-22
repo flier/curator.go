@@ -174,7 +174,7 @@ type curatorFramework struct {
 	listeners               CuratorListenable
 	unhandledErrorListeners UnhandledErrorListenable
 	defaultData             []byte
-	namespace               string
+	namespace               *namespaceImpl
 	retryPolicy             RetryPolicy
 	compressionProvider     CompressionProvider
 	aclProvider             ACLProvider
@@ -182,10 +182,9 @@ type curatorFramework struct {
 
 func newCuratorFramework(b *CuratorFrameworkBuilder) *curatorFramework {
 	c := &curatorFramework{
-		listeners:               new(curatorListenerContainer),
-		unhandledErrorListeners: new(unhandledErrorListenerContainer),
+		listeners:               &curatorListenerContainer{},
+		unhandledErrorListeners: &unhandledErrorListenerContainer{},
 		defaultData:             b.DefaultData,
-		namespace:               b.Namespace,
 		retryPolicy:             b.RetryPolicy,
 		compressionProvider:     b.CompressionProvider,
 		aclProvider:             b.AclProvider,
@@ -202,6 +201,7 @@ func newCuratorFramework(b *CuratorFrameworkBuilder) *curatorFramework {
 
 	c.client = NewCuratorZookeeperClient(b.ZookeeperDialer, b.EnsembleProvider, b.SessionTimeout, b.ConnectionTimeout, watcher, b.RetryPolicy, b.CanBeReadOnly, b.AuthInfos)
 	c.stateManager = newConnectionStateManager(c)
+	c.namespace = newNamespace(c, b.Namespace)
 	c.namespaceFacadeCache = newNamespaceFacadeCache(c)
 
 	return c
@@ -331,6 +331,12 @@ func (c *curatorFramework) processEvent(event CuratorEvent) {
 
 }
 
+func (c *curatorFramework) logError(err error) {
+	c.unhandledErrorListeners.ForEach(func(listener interface{}) {
+		listener.(UnhandledErrorListener).UnhandledError(err)
+	})
+}
+
 func (c *curatorFramework) NonNamespaceView() CuratorFramework {
 	return c.UsingNamespace("")
 }
@@ -342,15 +348,15 @@ func (c *curatorFramework) UsingNamespace(newNamespace string) CuratorFramework 
 }
 
 func (c *curatorFramework) Namespace() string {
-	return c.namespace
+	return c.namespace.namespace
 }
 
 func (c *curatorFramework) fixForNamespace(path string, isSequential bool) string {
-	return fixForNamespace(c.namespace, path, isSequential)
+	return c.namespace.fixForNamespace(path, isSequential)
 }
 
 func (c *curatorFramework) unfixForNamespace(path string) string {
-	return unfixForNamespace(c.namespace, path)
+	return c.namespace.unfixForNamespace(path)
 }
 
 func (c *curatorFramework) getNamespaceWatcher(watcher Watcher) Watcher {

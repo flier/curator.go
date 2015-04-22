@@ -61,13 +61,22 @@ func (c *mockConn) Close() {
 }
 
 func (c *mockConn) Create(path string, data []byte, flags int32, acls []zk.ACL) (string, error) {
+	/*
+		if c.log != nil {
+			c.log("Before Create(\"%s\", []byte(\"%s\"), %d, %v)", path, data, flags, acls)
+
+			if len(path) == 0 {
+				panic(path)
+			}
+		}
+	*/
 	args := c.Called(path, data, flags, acls)
 
 	createPath := args.String(0)
 	err := args.Error(1)
 
 	if c.log != nil {
-		c.log("Create(\"%s\", []byte(\"%s\"), %d, %v) (\"%s\", %v)", path, data, flags, acls, createPath, err)
+		c.log("Create(path=\"%s\", data=[]byte(\"%s\"), flags=%d, alcs=%v) (createdPath=\"%s\", error=%v)", path, data, flags, acls, createPath, err)
 	}
 
 	return createPath, err
@@ -76,24 +85,42 @@ func (c *mockConn) Create(path string, data []byte, flags int32, acls []zk.ACL) 
 func (c *mockConn) Exists(path string) (bool, *zk.Stat, error) {
 	args := c.Called(path)
 
+	exists := args.Bool(0)
 	stat, _ := args.Get(1).(*zk.Stat)
+	err := args.Error(2)
 
-	return args.Bool(0), stat, args.Error(2)
+	if c.log != nil {
+		c.log("Exists(path=\"%s\")(exists=%v, stat=%v, error=%v)", path, exists, stat, err)
+	}
+
+	return exists, stat, err
 }
 
 func (c *mockConn) ExistsW(path string) (bool, *zk.Stat, <-chan zk.Event, error) {
 	args := c.Called(path)
 
+	exists := args.Bool(0)
 	stat, _ := args.Get(1).(*zk.Stat)
 	events, _ := args.Get(2).(chan zk.Event)
+	err := args.Error(3)
 
-	return args.Bool(0), stat, events, args.Error(3)
+	if c.log != nil {
+		c.log("ExistsW(path=\"%s\")(exists=%v, stat=%v, events=%v, error=%v)", path, exists, stat, events, err)
+	}
+
+	return exists, stat, events, err
 }
 
 func (c *mockConn) Delete(path string, version int32) error {
 	args := c.Called(path, version)
 
-	return args.Error(0)
+	err := args.Error(0)
+
+	if c.log != nil {
+		c.log("Delete(path=\"%s\", version=%d) error=%v", path, version, err)
+	}
+
+	return err
 }
 
 func (c *mockConn) Get(path string) ([]byte, *zk.Stat, error) {

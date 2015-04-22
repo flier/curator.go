@@ -38,6 +38,7 @@ func (s *CreateBuilderTestSuite) SetupTest() {
 	}
 	s.events = make(chan zk.Event)
 
+	s.conn.On("Close").Return().Once()
 	s.dialer.On("Dial", s.builder.EnsembleProvider.ConnectionString(), s.builder.ConnectionTimeout, s.builder.CanBeReadOnly).Return(s.conn, s.events, nil).Once()
 }
 
@@ -62,6 +63,8 @@ func (s *CreateBuilderTestSuite) TestCreate() {
 
 	assert.Equal(s.T(), "/node", path)
 	assert.NoError(s.T(), err)
+
+	assert.NoError(s.T(), client.Close())
 }
 
 func (s *CreateBuilderTestSuite) TestNamespace() {
@@ -73,12 +76,16 @@ func (s *CreateBuilderTestSuite) TestNamespace() {
 
 	acls := zk.WorldACL(zk.PermAll)
 
+	s.conn.On("Exists", "/parent").Return(false, nil, nil).Once()
+	s.conn.On("Create", "/parent", []byte{}, int32(PERSISTENT), acls).Return("/parent", nil).Once()
 	s.conn.On("Create", "/parent/child", s.builder.DefaultData, int32(EPHEMERAL), acls).Return("/parent/child", nil).Once()
 
-	path, err := client.Create().WithMode(EPHEMERAL).WithACL(acls...).ForPath("child")
+	path, err := client.Create().WithMode(EPHEMERAL).WithACL(acls...).ForPath("/child")
 
 	assert.Equal(s.T(), "/child", path)
 	assert.NoError(s.T(), err)
+
+	assert.NoError(s.T(), client.Close())
 }
 
 func (s *CreateBuilderTestSuite) TestBackground() {
@@ -92,6 +99,7 @@ func (s *CreateBuilderTestSuite) TestBackground() {
 	acls := zk.AuthACL(zk.PermRead)
 	ctxt := "context"
 
+	s.conn.On("Exists", "/parent").Return(true, nil, nil).Once()
 	s.conn.On("Create", "/parent/child", data, int32(PERSISTENT), acls).Return("", zk.ErrAPIError).Once()
 
 	s.wg.Add(1)
@@ -114,6 +122,8 @@ func (s *CreateBuilderTestSuite) TestBackground() {
 
 	assert.Equal(s.T(), "/child", path)
 	assert.NoError(s.T(), err)
+
+	assert.NoError(s.T(), client.Close())
 }
 
 func (s *CreateBuilderTestSuite) TestCompression() {
@@ -132,11 +142,11 @@ func (s *CreateBuilderTestSuite) TestCompression() {
 
 	assert.Equal(s.T(), "/node", path)
 	assert.NoError(s.T(), err)
+
+	assert.NoError(s.T(), client.Close())
 }
 
 func (s *CreateBuilderTestSuite) TestCreateParents() {
-	s.builder.Namespace = "parent"
-
 	client := s.builder.Build()
 
 	assert.NoError(s.T(), client.Start())
@@ -146,8 +156,10 @@ func (s *CreateBuilderTestSuite) TestCreateParents() {
 	s.conn.On("Create", "/parent", []byte{}, int32(PERSISTENT), zk.WorldACL(zk.PermAll)).Return("/parent", nil).Once()
 	s.conn.On("Create", "/parent/child", s.builder.DefaultData, int32(PERSISTENT), []zk.ACL(nil)).Return("/parent/child", nil).Once()
 
-	path, err := client.Create().CreatingParentsIfNeeded().ForPath("/child")
+	path, err := client.Create().CreatingParentsIfNeeded().ForPath("/parent/child")
 
-	assert.Equal(s.T(), "/child", path)
+	assert.Equal(s.T(), "/parent/child", path)
 	assert.NoError(s.T(), err)
+
+	assert.NoError(s.T(), client.Close())
 }

@@ -2,13 +2,81 @@ package curator
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 )
 
+type namespaceImpl struct {
+	client     *curatorFramework
+	namespace  string
+	ensurePath EnsurePath
+}
+
+func newNamespace(client *curatorFramework, namespace string) *namespaceImpl {
+	n := &namespaceImpl{
+		client:    client,
+		namespace: namespace,
+	}
+
+	if len(namespace) > 0 {
+		if err := ValidatePath("/" + namespace); err != nil {
+			client.logError(fmt.Errorf("Invalid namespace: %s, %s", namespace, err))
+
+			return newNamespace(client, "")
+		}
+
+		n.ensurePath = NewEnsurePath(JoinPath("/", namespace))
+	}
+
+	return n
+}
+
+// Apply the namespace to the given path
+func FixForNamespace(namespace, path string, isSequential bool) (string, error) {
+	if len(namespace) > 0 {
+		return JoinPath(namespace, path), nil
+	}
+
+	return path, nil
+}
+
+func (n *namespaceImpl) fixForNamespace(path string, isSequential bool) string {
+	if n.ensurePath != nil {
+		n.ensurePath.Ensure(n.client.ZookeeperClient())
+	}
+
+	s, _ := FixForNamespace(n.namespace, path, isSequential)
+
+	return s
+}
+
+func (n *namespaceImpl) unfixForNamespace(path string) string {
+	if len(n.namespace) > 0 && len(path) > 0 {
+		prefix := JoinPath(n.namespace)
+
+		if strings.HasPrefix(path, prefix) {
+			if len(prefix) < len(path) {
+				return path[len(prefix):]
+			} else {
+				return PATH_SEPARATOR
+			}
+		}
+	}
+
+	return path
+}
+
 type namespaceFacade struct {
 	*curatorFramework
-	namespace string
+	namespace *namespaceImpl
+}
+
+func newNamespaceFacade(client *curatorFramework, namespace string) *namespaceFacade {
+	return &namespaceFacade{
+		curatorFramework: client,
+		namespace:        newNamespace(client, namespace),
+	}
 }
 
 func (f *namespaceFacade) Start() error {
@@ -20,43 +88,21 @@ func (f *namespaceFacade) Close() error {
 }
 
 func (f *namespaceFacade) CuratorListenable() CuratorListenable {
-	panic("CuratorListenable() is only available from a non-namespaced CuratorFramework instance")
+	f.logError(errors.New("CuratorListenable() is only available from a non-namespaced CuratorFramework instance"))
+
+	return nil
 }
 
 func (f *namespaceFacade) Namespace() string {
-	return f.namespace
+	return f.namespace.namespace
 }
 
 func (f *namespaceFacade) fixForNamespace(path string, isSequential bool) string {
-	return fixForNamespace(f.namespace, path, isSequential)
+	return f.namespace.fixForNamespace(path, isSequential)
 }
 
 func (f *namespaceFacade) unfixForNamespace(path string) string {
-	return unfixForNamespace(f.namespace, path)
-}
-
-// Apply the namespace to the given path
-func fixForNamespace(namespace, path string, isSequential bool) string {
-	if len(namespace) > 0 {
-		return JoinPath(namespace, path)
-	}
-
-	return path
-}
-
-func unfixForNamespace(namespace, path string) string {
-	if len(namespace) > 0 {
-		prefix := JoinPath(namespace)
-
-		if strings.HasPrefix(path, prefix) {
-			if len(path) > len(prefix) {
-				return path[len(prefix):]
-			} else {
-				return PATH_SEPARATOR
-			}
-		}
-	}
-	return path
+	return f.namespace.unfixForNamespace(path)
 }
 
 type namespaceFacadeCache struct {
@@ -72,17 +118,17 @@ func newNamespaceFacadeCache(client *curatorFramework) *namespaceFacadeCache {
 	}
 }
 
-func (c *namespaceFacadeCache) Get(newNamespace string) *namespaceFacade {
+func (c *namespaceFacadeCache) Get(namespace string) *namespaceFacade {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	if facade, exists := c.cache[newNamespace]; exists {
+	if facade, exists := c.cache[namespace]; exists {
 		return facade
 	}
 
-	facade := &namespaceFacade{c.client, newNamespace}
+	facade := newNamespaceFacade(c.client, namespace)
 
-	c.cache[newNamespace] = facade
+	c.cache[namespace] = facade
 
 	return facade
 }
