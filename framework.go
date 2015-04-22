@@ -185,6 +185,15 @@ func (b *CuratorFrameworkBuilder) Authorization(scheme string, auth []byte) *Cur
 	return b
 }
 
+// Add compression provider
+func (b *CuratorFrameworkBuilder) Compression(name string) *CuratorFrameworkBuilder {
+	if provider, exists := CompressionProviders[name]; exists {
+		b.CompressionProvider = provider
+	}
+
+	return b
+}
+
 type curatorFramework struct {
 	client                  *CuratorZookeeperClient
 	stateManager            *connectionStateManager
