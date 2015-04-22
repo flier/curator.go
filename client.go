@@ -77,12 +77,11 @@ func (d *DefaultZookeeperDialer) Dial(connString string, sessionTimeout time.Dur
 }
 
 type CuratorZookeeperClient struct {
-	state             *ZookeeperConnectionState
-	connectionTimeout time.Duration
-	watcher           Watcher
-	started           AtomicBool
-	TracerDriver      TracerDriver
-	RetryPolicy       RetryPolicy
+	state        *ZookeeperConnectionState
+	watcher      Watcher
+	started      AtomicBool
+	TracerDriver TracerDriver
+	RetryPolicy  RetryPolicy
 }
 
 func NewCuratorZookeeperClient(zookeeperDialer ZookeeperDialer, ensembleProvider EnsembleProvider, sessionTimeout, connectionTimeout time.Duration,
@@ -95,10 +94,9 @@ func NewCuratorZookeeperClient(zookeeperDialer ZookeeperDialer, ensembleProvider
 	tracer := newDefaultTracerDriver()
 
 	return &CuratorZookeeperClient{
-		state:             newZookeeperConnectionState(zookeeperDialer, ensembleProvider, sessionTimeout, connectionTimeout, watcher, tracer, canReadOnly, authInfos),
-		connectionTimeout: connectionTimeout,
-		TracerDriver:      tracer,
-		RetryPolicy:       retryPolicy,
+		state:        newZookeeperConnectionState(zookeeperDialer, ensembleProvider, sessionTimeout, connectionTimeout, watcher, tracer, canReadOnly, authInfos),
+		TracerDriver: tracer,
+		RetryPolicy:  retryPolicy,
 	}
 }
 
@@ -161,7 +159,7 @@ func (c *CuratorZookeeperClient) BlockUntilConnectedOrTimedOut() error {
 }
 
 func (c *CuratorZookeeperClient) internalBlockUntilConnectedOrTimedOut() error {
-	timer := time.NewTimer(c.connectionTimeout)
+	timer := time.NewTimer(c.state.connectionTimeout)
 	connected := make(chan error)
 
 	watcher := c.state.addParentWatcher(NewWatcher(func(*zk.Event) {
