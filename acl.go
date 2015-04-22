@@ -12,6 +12,22 @@ type ACLProvider interface {
 	GetAclForPath(path string) []zk.ACL
 }
 
+type defaultACLProvider struct {
+	defaultAcls []zk.ACL
+}
+
+func (p *defaultACLProvider) GetDefaultAcl() []zk.ACL {
+	return p.defaultAcls
+}
+
+func (p *defaultACLProvider) GetAclForPath(path string) []zk.ACL {
+	return p.defaultAcls
+}
+
+func NewDefaultACLProvider() ACLProvider {
+	return &defaultACLProvider{zk.WorldACL(zk.PermAll)}
+}
+
 type getACLBuilder struct {
 	client        *curatorFramework
 	backgrounding backgrounding
