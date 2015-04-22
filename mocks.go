@@ -2,6 +2,7 @@ package curator
 
 import (
 	"errors"
+	"math/rand"
 	"reflect"
 	"sync"
 	"testing"
@@ -427,6 +428,11 @@ func (c *mockContainer) Test(t *testing.T, callback interface{}) {
 	retryPolicy := &mockRetryPolicy{log: t.Logf}
 	aclProvider := &mockACLProvider{}
 
+	data := []byte("data")
+	version := rand.Int31()
+	stat := &zk.Stat{Version: version, Mtime: time.Now().Unix()}
+	acls := zk.AuthACL(zk.PermRead)
+
 	if c.builder.ZookeeperDialer == nil {
 		c.builder.ZookeeperDialer = zookeeperDialer
 	}
@@ -487,6 +493,18 @@ func (c *mockContainer) Test(t *testing.T, callback interface{}) {
 		case reflect.TypeOf(wg):
 			wg = new(sync.WaitGroup)
 			args[i] = reflect.ValueOf(wg)
+
+		case reflect.TypeOf(data):
+			args[i] = reflect.ValueOf(data)
+
+		case reflect.TypeOf(version):
+			args[i] = reflect.ValueOf(version)
+
+		case reflect.TypeOf(stat):
+			args[i] = reflect.ValueOf(stat)
+
+		case reflect.TypeOf(acls):
+			args[i] = reflect.ValueOf(acls)
 
 		default:
 			t.Errorf("unknown arg type: %s", fn.In(i))
