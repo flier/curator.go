@@ -102,7 +102,7 @@ func (t *curatorTransaction) Commit() ([]TransactionResult, error) {
 		if conn, err := zkClient.Conn(); err != nil {
 			return nil, err
 		} else {
-			return conn.Multi(t.operations)
+			return conn.Multi(t.operations...)
 		}
 	})
 

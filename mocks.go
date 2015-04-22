@@ -47,6 +47,8 @@ func (s *mockRetrySleeper) SleepFor(time time.Duration) error {
 type mockConn struct {
 	mock.Mock
 
+	operations []interface{}
+
 	log infof
 }
 
@@ -197,11 +199,18 @@ func (c *mockConn) SetACL(path string, acls []zk.ACL, version int32) (*zk.Stat, 
 }
 
 func (c *mockConn) Multi(ops ...interface{}) ([]zk.MultiResponse, error) {
+	c.operations = append(c.operations, ops...)
+
 	args := c.Called(ops)
 
 	res, _ := args.Get(0).([]zk.MultiResponse)
+	err := args.Error(1)
 
-	return res, args.Error(1)
+	if c.log != nil {
+		c.log("Multi(ops=%v)(responses=%v, error=%v)", ops, res, err)
+	}
+
+	return res, err
 }
 
 func (c *mockConn) Sync(path string) (string, error) {
