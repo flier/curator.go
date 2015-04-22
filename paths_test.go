@@ -143,3 +143,28 @@ func TestDeleteChildren(t *testing.T) {
 
 	conn.AssertExpectations(t)
 }
+
+func TestEnsurePath(t *testing.T) {
+	helper := &mockEnsurePathHelper{log: t.Logf}
+
+	ensure := NewEnsurePathWithAclAndHelper("/parent/child", nil, helper)
+
+	assert.NotNil(t, ensure)
+	assert.True(t, ensure.makeLastNode)
+
+	ensure2 := ensure.ExcludingLast()
+
+	assert.NotNil(t, ensure2)
+
+	client := &CuratorZookeeperClient{}
+
+	helper.On("Ensure", client, "/parent/child", true).Return(nil).Once()
+
+	assert.NoError(t, ensure.Ensure(client))
+
+	helper.On("Ensure", client, "/parent/child", false).Return(nil).Once()
+
+	assert.NoError(t, ensure2.Ensure(client))
+
+	helper.AssertExpectations(t)
+}

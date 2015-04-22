@@ -277,3 +277,51 @@ func (p *mockACLProvider) GetAclForPath(path string) []zk.ACL {
 
 	return args.Get(0).([]zk.ACL)
 }
+
+type mockEnsurePath struct {
+	mock.Mock
+
+	log infof
+}
+
+func (e *mockEnsurePath) Ensure(client *CuratorZookeeperClient) error {
+	args := e.Mock.Called(client)
+
+	err := args.Error(0)
+
+	if e.log != nil {
+		e.log("Ensure(client=%p) error=%v", client, err)
+	}
+
+	return err
+}
+
+func (e *mockEnsurePath) ExcludingLast() EnsurePath {
+	args := e.Mock.Called()
+
+	ret, _ := args.Get(0).(EnsurePath)
+
+	if e.log != nil {
+		e.log("ExcludingLast() EnsurePath=%p", ret)
+	}
+
+	return ret
+}
+
+type mockEnsurePathHelper struct {
+	mock.Mock
+
+	log infof
+}
+
+func (h *mockEnsurePathHelper) Ensure(client *CuratorZookeeperClient, path string, makeLastNode bool) error {
+	args := h.Called(client, path, makeLastNode)
+
+	err := args.Error(0)
+
+	if h.log != nil {
+		h.log("Ensure(client=%p, path=\"%s\", makeLastNode=%v) error=%v", client, path, makeLastNode, err)
+	}
+
+	return err
+}
