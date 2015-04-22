@@ -9,94 +9,68 @@ import (
 )
 
 func TestTransaction(t *testing.T) {
-	conn := &mockConn{log: t.Logf}
-	dialer := &mockZookeeperDialer{log: t.Logf}
-	compress := &mockCompressionProvider{log: t.Logf}
-	builder := &CuratorFrameworkBuilder{
-		ZookeeperDialer:     dialer,
-		EnsembleProvider:    &fixedEnsembleProvider{"connectString"},
-		CompressionProvider: compress,
-		RetryPolicy:         NewRetryOneTime(0),
-		DefaultData:         []byte("default"),
-	}
-	events := make(chan zk.Event)
+	newMockZookeeperClient().WithNamespace("parent").Test(t, func(client CuratorFramework, conn *mockConn, compress *mockCompressionProvider) {
+		acls := zk.AuthACL(zk.PermRead)
 
-	conn.On("Close").Return().Once()
-	dialer.On("Dial", builder.EnsembleProvider.ConnectionString(), DEFAULT_CONNECTION_TIMEOUT, builder.CanBeReadOnly).Return(conn, events, nil).Once()
+		compress.On("Compress", "/node1", []byte("default")).Return([]byte("compressed(default)"), nil).Once()
+		compress.On("Compress", "/node3", []byte("data")).Return([]byte("compressed(data)"), nil).Once()
 
-	builder.Namespace = "parent"
-	client := builder.Build()
+		conn.On("Exists", "/parent").Return(true, nil, nil).Once()
+		conn.On("Multi", mock.Anything).Return([]zk.MultiResponse{
+			{Stat: nil, String: "/parent/node1"},
+			{Stat: nil, String: ""},
+			{Stat: &zk.Stat{}, String: ""},
+			{Stat: nil, String: ""},
+		}, nil).Once()
 
-	assert.NoError(t, client.Start())
+		results, err := client.InTransaction().
+			Create().WithMode(PERSISTENT_SEQUENTIAL).WithACL(acls...).Compressed().ForPath("/node1").
+			Delete().WithVersion(3).ForPath("/node2").
+			SetData().WithVersion(5).Compressed().ForPathWithData("/node3", []byte("data")).
+			Check().WithVersion(7).ForPath("/node4").
+			Commit()
 
-	acls := zk.AuthACL(zk.PermRead)
-
-	compress.On("Compress", "/node1", []byte("default")).Return([]byte("compressed(default)"), nil).Once()
-	compress.On("Compress", "/node3", []byte("data")).Return([]byte("compressed(data)"), nil).Once()
-
-	conn.On("Exists", "/parent").Return(true, nil, nil).Once()
-	conn.On("Multi", mock.Anything).Return([]zk.MultiResponse{
-		{Stat: nil, String: "/parent/node1"},
-		{Stat: nil, String: ""},
-		{Stat: &zk.Stat{}, String: ""},
-		{Stat: nil, String: ""},
-	}, nil).Once()
-
-	results, err := client.InTransaction().
-		Create().WithMode(PERSISTENT_SEQUENTIAL).WithACL(acls...).Compressed().ForPath("/node1").
-		Delete().WithVersion(3).ForPath("/node2").
-		SetData().WithVersion(5).Compressed().ForPathWithData("/node3", []byte("data")).
-		Check().WithVersion(7).ForPath("/node4").
-		Commit()
-
-	assert.NoError(t, err)
-	assert.Equal(t, conn.operations, []interface{}{
-		&zk.CreateRequest{
-			Path:  "/parent/node1",
-			Data:  []byte("compressed(default)"),
-			Acl:   acls,
-			Flags: int32(PERSISTENT_SEQUENTIAL),
-		},
-		&zk.DeleteRequest{
-			Path:    "/parent/node2",
-			Version: int32(3),
-		},
-		&zk.SetDataRequest{
-			Path:    "/parent/node3",
-			Data:    []byte("compressed(data)"),
-			Version: int32(5),
-		},
-		&zk.CheckVersionRequest{
-			Path:    "/parent/node4",
-			Version: int32(7),
-		},
+		assert.NoError(t, err)
+		assert.Equal(t, conn.operations, []interface{}{
+			&zk.CreateRequest{
+				Path:  "/parent/node1",
+				Data:  []byte("compressed(default)"),
+				Acl:   acls,
+				Flags: int32(PERSISTENT_SEQUENTIAL),
+			},
+			&zk.DeleteRequest{
+				Path:    "/parent/node2",
+				Version: int32(3),
+			},
+			&zk.SetDataRequest{
+				Path:    "/parent/node3",
+				Data:    []byte("compressed(data)"),
+				Version: int32(5),
+			},
+			&zk.CheckVersionRequest{
+				Path:    "/parent/node4",
+				Version: int32(7),
+			},
+		})
+		assert.Equal(t, results, []TransactionResult{
+			{
+				Type:       OP_CREATE,
+				ForPath:    "/parent/node1",
+				ResultPath: "/node1",
+			},
+			{
+				Type:    OP_DELETE,
+				ForPath: "/parent/node2",
+			},
+			{
+				Type:       OP_SET_DATA,
+				ForPath:    "/parent/node3",
+				ResultStat: &zk.Stat{},
+			},
+			{
+				Type:    OP_CHECK,
+				ForPath: "/parent/node4",
+			},
+		})
 	})
-	assert.Equal(t, results, []TransactionResult{
-		{
-			Type:       OP_CREATE,
-			ForPath:    "/parent/node1",
-			ResultPath: "/node1",
-		},
-		{
-			Type:    OP_DELETE,
-			ForPath: "/parent/node2",
-		},
-		{
-			Type:       OP_SET_DATA,
-			ForPath:    "/parent/node3",
-			ResultStat: &zk.Stat{},
-		},
-		{
-			Type:    OP_CHECK,
-			ForPath: "/parent/node4",
-		},
-	})
-
-	assert.NoError(t, client.Close())
-
-	close(events)
-
-	conn.AssertExpectations(t)
-	dialer.AssertExpectations(t)
-	compress.AssertExpectations(t)
 }

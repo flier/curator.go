@@ -2,10 +2,15 @@ package curator
 
 import (
 	"errors"
+	"reflect"
+	"sync"
+	"testing"
 	"time"
 
 	"github.com/samuel/go-zookeeper/zk"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/suite"
 )
 
 type infof func(format string, args ...interface{})
@@ -333,4 +338,116 @@ func (h *mockEnsurePathHelper) Ensure(client *CuratorZookeeperClient, path strin
 	}
 
 	return err
+}
+
+type mockZookeeperClient struct {
+	conn     *mockConn
+	dialer   *mockZookeeperDialer
+	compress *mockCompressionProvider
+	builder  *CuratorFrameworkBuilder
+	events   chan zk.Event
+	wg       sync.WaitGroup
+}
+
+func newMockZookeeperClient() *mockZookeeperClient {
+	c := &mockZookeeperClient{
+		conn:     &mockConn{},
+		dialer:   &mockZookeeperDialer{},
+		compress: &mockCompressionProvider{},
+		events:   make(chan zk.Event),
+	}
+
+	c.builder = &CuratorFrameworkBuilder{
+		ZookeeperDialer:     c.dialer,
+		EnsembleProvider:    &fixedEnsembleProvider{"connectString"},
+		CompressionProvider: c.compress,
+		RetryPolicy:         NewRetryOneTime(0),
+		DefaultData:         []byte("default"),
+	}
+
+	return c
+}
+
+func (c *mockZookeeperClient) WithNamespace(namespace string) *mockZookeeperClient {
+	c.builder.Namespace = namespace
+
+	return c
+}
+
+func (c *mockZookeeperClient) Test(t *testing.T, callback interface{}) {
+	c.conn.log = t.Logf
+	c.dialer.log = t.Logf
+	c.compress.log = t.Logf
+
+	client := c.builder.Build()
+
+	c.dialer.On("Dial", c.builder.EnsembleProvider.ConnectionString(), DEFAULT_CONNECTION_TIMEOUT, c.builder.CanBeReadOnly).Return(c.conn, c.events, nil).Once()
+
+	assert.NoError(t, client.Start())
+
+	fn := reflect.TypeOf(callback)
+
+	assert.Equal(t, reflect.Func, fn.Kind())
+
+	args := make([]reflect.Value, fn.NumIn())
+
+	waiting := false
+
+	for i := 0; i < fn.NumIn(); i++ {
+		switch argType := fn.In(i); argType {
+		case reflect.TypeOf(c.builder):
+			args[i] = reflect.ValueOf(c.builder)
+
+		case reflect.TypeOf((*CuratorFramework)(nil)).Elem():
+			args[i] = reflect.ValueOf(client)
+
+		case reflect.TypeOf((*ZookeeperConnection)(nil)).Elem(), reflect.TypeOf(c.conn):
+			args[i] = reflect.ValueOf(c.conn)
+
+		case reflect.TypeOf((*ZookeeperDialer)(nil)).Elem(), reflect.TypeOf(c.dialer):
+			args[i] = reflect.ValueOf(c.dialer)
+
+		case reflect.TypeOf((*ZookeeperDialer)(nil)).Elem(), reflect.TypeOf(c.compress):
+			args[i] = reflect.ValueOf(c.compress)
+
+		case reflect.TypeOf(c.events):
+			args[i] = reflect.ValueOf(c.events)
+
+		case reflect.TypeOf(&c.wg):
+			args[i] = reflect.ValueOf(&c.wg)
+			c.wg.Add(1)
+			waiting = true
+
+		default:
+			t.Errorf("unknown arg type: %s", fn.In(i))
+		}
+	}
+
+	reflect.ValueOf(callback).Call(args)
+
+	if waiting {
+		c.wg.Wait()
+	}
+
+	c.conn.On("Close").Return().Once()
+
+	assert.NoError(t, client.Close())
+
+	close(c.events)
+
+	c.conn.AssertExpectations(t)
+	c.dialer.AssertExpectations(t)
+	c.compress.AssertExpectations(t)
+}
+
+type mockClientTestSuite struct {
+	suite.Suite
+}
+
+func (s *mockClientTestSuite) WithClient(callback interface{}) {
+	newMockZookeeperClient().Test(s.T(), callback)
+}
+
+func (s *mockClientTestSuite) WithClientAndNamespace(namespace string, callback interface{}) {
+	newMockZookeeperClient().WithNamespace(namespace).Test(s.T(), callback)
 }
