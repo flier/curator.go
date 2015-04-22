@@ -23,12 +23,6 @@ func (b *getDataBuilder) ForPath(givenPath string) ([]byte, error) {
 
 	if payload, err := b.pathInForeground(adjustedPath); err != nil {
 		return nil, err
-	} else if b.decompress {
-		if data, err := b.client.compressionProvider.Decompress(givenPath, payload); err != nil {
-			return nil, err
-		} else {
-			return data, nil
-		}
 	} else {
 		return payload, err
 	}
@@ -85,6 +79,14 @@ func (b *getDataBuilder) pathInForeground(path string) ([]byte, error) {
 
 			if stat != nil && b.stat != nil {
 				*b.stat = *stat
+			}
+
+			if b.decompress {
+				if payload, err := b.client.compressionProvider.Decompress(path, data); err != nil {
+					return nil, err
+				} else {
+					data = payload
+				}
 			}
 
 			return data, err
