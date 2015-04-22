@@ -46,9 +46,7 @@ func (s *CreateBuilderTestSuite) TestNamespace() {
 }
 
 func (s *CreateBuilderTestSuite) TestBackground() {
-	s.WithNamespace("parent", func(client CuratorFramework, conn *mockConn, wg *sync.WaitGroup) {
-		data := []byte("data")
-		acls := zk.AuthACL(zk.PermRead)
+	s.WithNamespace("parent", func(client CuratorFramework, conn *mockConn, wg *sync.WaitGroup, data []byte, acls []zk.ACL) {
 		ctxt := "context"
 
 		conn.On("Exists", "/parent").Return(true, nil, nil).Once()
@@ -75,10 +73,8 @@ func (s *CreateBuilderTestSuite) TestBackground() {
 }
 
 func (s *CreateBuilderTestSuite) TestCompression() {
-	s.With(func(client CuratorFramework, conn *mockConn, compress *mockCompressionProvider) {
-		data := []byte("data")
+	s.With(func(client CuratorFramework, conn *mockConn, compress *mockCompressionProvider, data []byte, acls []zk.ACL) {
 		compressedData := []byte("compressedData")
-		acls := zk.WorldACL(zk.PermAll)
 
 		compress.On("Compress", "/node", data).Return(compressedData, nil).Once()
 		conn.On("Create", "/node", compressedData, int32(PERSISTENT), acls).Return("/node", nil).Once()

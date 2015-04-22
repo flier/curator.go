@@ -19,24 +19,24 @@ func TestDeleteBuilder(t *testing.T) {
 
 func (s *DeleteBuilderTestSuite) TestDelete() {
 	s.With(func(client CuratorFramework, conn *mockConn) {
-		conn.On("Delete", "/node", -1).Return(nil).Once()
+		conn.On("Delete", "/node", AnyVersion).Return(nil).Once()
 
 		assert.NoError(s.T(), client.Delete().ForPath("/node"))
 	})
 }
 
 func (s *DeleteBuilderTestSuite) TestDeleteWithVersion() {
-	s.With(func(client CuratorFramework, conn *mockConn) {
-		conn.On("Delete", "/node", 1).Return(zk.ErrBadVersion).Once()
+	s.With(func(client CuratorFramework, conn *mockConn, version int32) {
+		conn.On("Delete", "/node", version).Return(zk.ErrBadVersion).Once()
 
-		assert.EqualError(s.T(), client.Delete().WithVersion(1).ForPath("/node"), zk.ErrBadVersion.Error())
+		assert.EqualError(s.T(), client.Delete().WithVersion(version).ForPath("/node"), zk.ErrBadVersion.Error())
 	})
 }
 
 func (s *DeleteBuilderTestSuite) TestNamespace() {
 	s.WithNamespace("parent", func(client CuratorFramework, conn *mockConn) {
 		conn.On("Exists", "/parent").Return(true, nil, nil).Once()
-		conn.On("Delete", "/parent/child", -1).Return(nil).Once()
+		conn.On("Delete", "/parent/child", AnyVersion).Return(nil).Once()
 
 		assert.NoError(s.T(), client.Delete().ForPath("/child"))
 	})
@@ -47,7 +47,7 @@ func (s *DeleteBuilderTestSuite) TestBackground() {
 		ctxt := "context"
 
 		conn.On("Exists", "/parent").Return(true, nil, nil).Once()
-		conn.On("Delete", "/parent/child", -1).Return(nil).Once()
+		conn.On("Delete", "/parent/child", AnyVersion).Return(nil).Once()
 
 		assert.NoError(s.T(), client.Delete().InBackgroundWithCallbackAndContext(
 			func(client CuratorFramework, event CuratorEvent) error {
@@ -66,11 +66,11 @@ func (s *DeleteBuilderTestSuite) TestBackground() {
 
 func (s *DeleteBuilderTestSuite) TestDeletingChildren() {
 	s.With(func(client CuratorFramework, conn *mockConn) {
-		conn.On("Delete", "/parent", -1).Return(zk.ErrNotEmpty).Once()
+		conn.On("Delete", "/parent", AnyVersion).Return(zk.ErrNotEmpty).Once()
 		conn.On("Children", "/parent").Return([]string{"child"}, nil, nil).Once()
 		conn.On("Children", "/parent/child").Return([]string{}, nil, nil).Once()
-		conn.On("Delete", "/parent/child", -1).Return(nil).Once()
-		conn.On("Delete", "/parent", -1).Return(nil).Once()
+		conn.On("Delete", "/parent/child", AnyVersion).Return(nil).Once()
+		conn.On("Delete", "/parent", AnyVersion).Return(nil).Once()
 
 		assert.NoError(s.T(), client.Delete().DeletingChildrenIfNeeded().ForPath("/parent"))
 	})

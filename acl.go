@@ -129,7 +129,7 @@ type setACLBuilder struct {
 	client        *curatorFramework
 	backgrounding backgrounding
 	acling        acling
-	version       int
+	version       int32
 }
 
 func (b *setACLBuilder) ForPath(givenPath string) (*zk.Stat, error) {
@@ -178,7 +178,7 @@ func (b *setACLBuilder) pathInForeground(path string) (*zk.Stat, error) {
 		if conn, err := zkClient.Conn(); err != nil {
 			return nil, err
 		} else {
-			return conn.SetACL(path, b.acling.aclList, int32(b.version))
+			return conn.SetACL(path, b.acling.aclList, b.version)
 		}
 	})
 
@@ -193,7 +193,7 @@ func (b *setACLBuilder) WithACL(acls ...zk.ACL) SetACLBuilder {
 	return b
 }
 
-func (b *setACLBuilder) WithVersion(version int) SetACLBuilder {
+func (b *setACLBuilder) WithVersion(version int32) SetACLBuilder {
 	b.version = version
 
 	return b

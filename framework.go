@@ -285,7 +285,7 @@ func (c *curatorFramework) Create() CreateBuilder {
 func (c *curatorFramework) Delete() DeleteBuilder {
 	c.state.Check(STARTED, "instance must be started before calling this method")
 
-	return &deleteBuilder{client: c, version: -1}
+	return &deleteBuilder{client: c, version: AnyVersion}
 }
 
 func (c *curatorFramework) CheckExists() CheckExistsBuilder {
@@ -303,7 +303,7 @@ func (c *curatorFramework) GetData() GetDataBuilder {
 func (c *curatorFramework) SetData() SetDataBuilder {
 	c.state.Check(STARTED, "instance must be started before calling this method")
 
-	return &setDataBuilder{client: c, version: -1}
+	return &setDataBuilder{client: c, version: AnyVersion}
 }
 
 func (c *curatorFramework) GetChildren() GetChildrenBuilder {
@@ -321,7 +321,7 @@ func (c *curatorFramework) GetACL() GetACLBuilder {
 func (c *curatorFramework) SetACL() SetACLBuilder {
 	c.state.Check(STARTED, "instance must be started before calling this method")
 
-	return &setACLBuilder{client: c, version: -1}
+	return &setACLBuilder{client: c, version: AnyVersion}
 }
 
 func (c *curatorFramework) InTransaction() Transaction {

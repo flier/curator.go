@@ -8,7 +8,7 @@ type deleteBuilder struct {
 	client                   *curatorFramework
 	backgrounding            backgrounding
 	deletingChildrenIfNeeded bool
-	version                  int
+	version                  int32
 }
 
 func (b *deleteBuilder) ForPath(givenPath string) error {
@@ -57,7 +57,7 @@ func (b *deleteBuilder) pathInForeground(path string, givenPath string) error {
 		conn, err := zkClient.Conn()
 
 		if err == nil {
-			err = conn.Delete(path, int32(b.version))
+			err = conn.Delete(path, b.version)
 
 			if err == zk.ErrNotEmpty && b.deletingChildrenIfNeeded {
 				err = DeleteChildren(conn, path, true)
@@ -76,7 +76,7 @@ func (b *deleteBuilder) DeletingChildrenIfNeeded() DeleteBuilder {
 	return b
 }
 
-func (b *deleteBuilder) WithVersion(version int) DeleteBuilder {
+func (b *deleteBuilder) WithVersion(version int32) DeleteBuilder {
 	b.version = version
 
 	return b

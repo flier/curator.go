@@ -80,15 +80,15 @@ func (t *curatorTransaction) Create() TransactionCreateBuilder {
 }
 
 func (t *curatorTransaction) Delete() TransactionDeleteBuilder {
-	return &transactionDeleteBuilder{transaction: t, version: -1}
+	return &transactionDeleteBuilder{transaction: t, version: AnyVersion}
 }
 
 func (t *curatorTransaction) SetData() TransactionSetDataBuilder {
-	return &transactionSetDataBuilder{transaction: t, version: -1}
+	return &transactionSetDataBuilder{transaction: t, version: AnyVersion}
 }
 
 func (t *curatorTransaction) Check() TransactionCheckBuilder {
-	return &transactionCheckBuilder{transaction: t, version: -1}
+	return &transactionCheckBuilder{transaction: t, version: AnyVersion}
 }
 
 func (t *curatorTransaction) And() TransactionFinal {
@@ -190,19 +190,19 @@ func (b *transactionCreateBuilder) Compressed() TransactionCreateBuilder {
 
 type transactionDeleteBuilder struct {
 	transaction *curatorTransaction
-	version     int
+	version     int32
 }
 
 func (b *transactionDeleteBuilder) ForPath(path string) TransactionBridge {
 	b.transaction.operations = append(b.transaction.operations, &zk.DeleteRequest{
 		Path:    b.transaction.client.fixForNamespace(path, false),
-		Version: int32(b.version),
+		Version: b.version,
 	})
 
 	return b.transaction
 }
 
-func (b *transactionDeleteBuilder) WithVersion(version int) TransactionDeleteBuilder {
+func (b *transactionDeleteBuilder) WithVersion(version int32) TransactionDeleteBuilder {
 	b.version = version
 
 	return b
@@ -210,7 +210,7 @@ func (b *transactionDeleteBuilder) WithVersion(version int) TransactionDeleteBui
 
 type transactionSetDataBuilder struct {
 	transaction *curatorTransaction
-	version     int
+	version     int32
 	compress    bool
 }
 
@@ -230,13 +230,13 @@ func (b *transactionSetDataBuilder) ForPathWithData(path string, payload []byte)
 	b.transaction.operations = append(b.transaction.operations, &zk.SetDataRequest{
 		Path:    b.transaction.client.fixForNamespace(path, false),
 		Data:    data,
-		Version: int32(b.version),
+		Version: b.version,
 	})
 
 	return b.transaction
 }
 
-func (b *transactionSetDataBuilder) WithVersion(version int) TransactionSetDataBuilder {
+func (b *transactionSetDataBuilder) WithVersion(version int32) TransactionSetDataBuilder {
 	b.version = version
 
 	return b
@@ -250,19 +250,19 @@ func (b *transactionSetDataBuilder) Compressed() TransactionSetDataBuilder {
 
 type transactionCheckBuilder struct {
 	transaction *curatorTransaction
-	version     int
+	version     int32
 }
 
 func (b *transactionCheckBuilder) ForPath(path string) TransactionBridge {
 	b.transaction.operations = append(b.transaction.operations, &zk.CheckVersionRequest{
 		Path:    b.transaction.client.fixForNamespace(path, false),
-		Version: int32(b.version),
+		Version: b.version,
 	})
 
 	return b.transaction
 }
 
-func (b *transactionCheckBuilder) WithVersion(version int) TransactionCheckBuilder {
+func (b *transactionCheckBuilder) WithVersion(version int32) TransactionCheckBuilder {
 	b.version = version
 
 	return b

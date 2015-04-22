@@ -18,12 +18,12 @@ func TestCheckExistsBuilder(t *testing.T) {
 }
 
 func (s *CheckExistsBuilderTestSuite) TestCheckExists() {
-	s.With(func(client CuratorFramework, conn *mockConn) {
-		conn.On("Exists", "/node").Return(true, &zk.Stat{}, nil).Once()
+	s.With(func(client CuratorFramework, conn *mockConn, stat *zk.Stat) {
+		conn.On("Exists", "/node").Return(true, stat, nil).Once()
 
-		stat, err := client.CheckExists().ForPath("/node")
+		stat2, err := client.CheckExists().ForPath("/node")
 
-		assert.NotNil(s.T(), stat)
+		assert.Equal(s.T(), stat, stat2)
 		assert.NoError(s.T(), err)
 	})
 
@@ -59,11 +59,11 @@ func (s *CheckExistsBuilderTestSuite) TestNamespace() {
 }
 
 func (s *CheckExistsBuilderTestSuite) TestBackground() {
-	s.WithNamespace("parent", func(client CuratorFramework, conn *mockConn, wg *sync.WaitGroup) {
+	s.WithNamespace("parent", func(client CuratorFramework, conn *mockConn, wg *sync.WaitGroup, stat *zk.Stat) {
 		ctxt := "context"
 
 		conn.On("Exists", "/parent").Return(true, nil, nil).Once()
-		conn.On("Exists", "/parent/child").Return(true, &zk.Stat{}, nil).Once()
+		conn.On("Exists", "/parent/child").Return(true, stat, nil).Once()
 
 		stat, err := client.CheckExists().InBackgroundWithCallbackAndContext(
 			func(client CuratorFramework, event CuratorEvent) error {

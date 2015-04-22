@@ -4,6 +4,8 @@ import (
 	"github.com/samuel/go-zookeeper/zk"
 )
 
+const AnyVersion int32 = -1
+
 type CreateMode int32
 
 const (

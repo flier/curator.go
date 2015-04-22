@@ -91,7 +91,7 @@ type DeleteBuilder interface {
 	// Versionable[T]
 	//
 	// Use the given version (the default is -1)
-	WithVersion(version int) DeleteBuilder
+	WithVersion(version int32) DeleteBuilder
 
 	// Backgroundable[T]
 	//
@@ -159,7 +159,7 @@ type SetDataBuilder interface {
 	// Versionable[T]
 	//
 	// Use the given version (the default is -1)
-	WithVersion(version int) SetDataBuilder
+	WithVersion(version int32) SetDataBuilder
 
 	// Compressible[T]
 	//
@@ -255,7 +255,7 @@ type SetACLBuilder interface {
 	// Versionable[T]
 	//
 	// Use the given version (the default is -1)
-	WithVersion(version int) SetACLBuilder
+	WithVersion(version int32) SetACLBuilder
 
 	// Backgroundable[T]
 	//
@@ -327,7 +327,7 @@ type TransactionDeleteBuilder interface {
 	// Versionable[T]
 	//
 	// Use the given version (the default is -1)
-	WithVersion(version int) TransactionDeleteBuilder
+	WithVersion(version int32) TransactionDeleteBuilder
 }
 
 type TransactionSetDataBuilder interface {
@@ -342,7 +342,7 @@ type TransactionSetDataBuilder interface {
 	// Versionable[T]
 	//
 	// Use the given version (the default is -1)
-	WithVersion(version int) TransactionSetDataBuilder
+	WithVersion(version int32) TransactionSetDataBuilder
 
 	// Compressible[T]
 	//
@@ -359,7 +359,7 @@ type TransactionCheckBuilder interface {
 	// Versionable[T]
 	//
 	// Use the given version (the default is -1)
-	WithVersion(version int) TransactionCheckBuilder
+	WithVersion(version int32) TransactionCheckBuilder
 }
 
 type acling struct {

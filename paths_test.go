@@ -127,8 +127,8 @@ func TestDeleteChildren(t *testing.T) {
 	conn.On("Children", "/parent").Return([]string{"child1", "child2"}, nil, nil).Once()
 	conn.On("Children", "/parent/child1").Return(nil, nil, nil).Once()
 	conn.On("Children", "/parent/child2").Return(nil, nil, nil).Once()
-	conn.On("Delete", "/parent/child1", -1).Return(nil).Once()
-	conn.On("Delete", "/parent/child2", -1).Return(zk.ErrNoNode).Once()
+	conn.On("Delete", "/parent/child1", AnyVersion).Return(nil).Once()
+	conn.On("Delete", "/parent/child2", AnyVersion).Return(zk.ErrNoNode).Once()
 
 	assert.NoError(t, DeleteChildren(conn, "/parent", false))
 

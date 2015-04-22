@@ -9,7 +9,7 @@ import (
 )
 
 func TestTransaction(t *testing.T) {
-	newMockContainer().WithNamespace("parent").Test(t, func(client CuratorFramework, conn *mockConn, compress *mockCompressionProvider) {
+	newMockContainer().WithNamespace("parent").Test(t, func(client CuratorFramework, conn *mockConn, compress *mockCompressionProvider, version int32) {
 		acls := zk.AuthACL(zk.PermRead)
 
 		compress.On("Compress", "/node1", []byte("default")).Return([]byte("compressed(default)"), nil).Once()
@@ -25,9 +25,9 @@ func TestTransaction(t *testing.T) {
 
 		results, err := client.InTransaction().
 			Create().WithMode(PERSISTENT_SEQUENTIAL).WithACL(acls...).Compressed().ForPath("/node1").
-			Delete().WithVersion(3).ForPath("/node2").
-			SetData().WithVersion(5).Compressed().ForPathWithData("/node3", []byte("data")).
-			Check().WithVersion(7).ForPath("/node4").
+			Delete().WithVersion(version).ForPath("/node2").
+			SetData().WithVersion(version+1).Compressed().ForPathWithData("/node3", []byte("data")).
+			Check().WithVersion(version + 2).ForPath("/node4").
 			Commit()
 
 		assert.NoError(t, err)
@@ -40,16 +40,16 @@ func TestTransaction(t *testing.T) {
 			},
 			&zk.DeleteRequest{
 				Path:    "/parent/node2",
-				Version: int32(3),
+				Version: version,
 			},
 			&zk.SetDataRequest{
 				Path:    "/parent/node3",
 				Data:    []byte("compressed(data)"),
-				Version: int32(5),
+				Version: version + 1,
 			},
 			&zk.CheckVersionRequest{
 				Path:    "/parent/node4",
-				Version: int32(7),
+				Version: version + 2,
 			},
 		})
 		assert.Equal(t, results, []TransactionResult{

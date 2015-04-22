@@ -149,7 +149,7 @@ func (b *getDataBuilder) InBackgroundWithCallbackAndContext(callback BackgroundC
 type setDataBuilder struct {
 	client        *curatorFramework
 	backgrounding backgrounding
-	version       int
+	version       int32
 	compress      bool
 }
 
@@ -211,7 +211,7 @@ func (b *setDataBuilder) pathInForeground(path string, payload []byte) (*zk.Stat
 		if conn, err := zkClient.Conn(); err != nil {
 			return nil, err
 		} else {
-			return conn.Set(path, payload, int32(b.version))
+			return conn.Set(path, payload, b.version)
 		}
 	})
 
@@ -220,7 +220,7 @@ func (b *setDataBuilder) pathInForeground(path string, payload []byte) (*zk.Stat
 	return stat, err
 }
 
-func (b *setDataBuilder) WithVersion(version int) SetDataBuilder {
+func (b *setDataBuilder) WithVersion(version int32) SetDataBuilder {
 	b.version = version
 
 	return b
