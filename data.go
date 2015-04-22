@@ -77,7 +77,7 @@ func (b *getDataBuilder) pathInForeground(path string) ([]byte, error) {
 				data, stat, events, err = conn.GetW(path)
 
 				if events != nil && b.watching.watcher != nil {
-					NewWatchers(b.watching.watcher).Watch(events)
+					go NewWatchers(b.watching.watcher).Watch(events)
 				}
 			} else {
 				data, stat, err = conn.Get(path)

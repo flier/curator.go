@@ -70,7 +70,7 @@ func (b *getChildrenBuilder) pathInForeground(path string) ([]string, error) {
 				children, stat, events, err = conn.ChildrenW(path)
 
 				if events != nil && b.watching.watcher != nil {
-					NewWatchers(b.watching.watcher).Watch(events)
+					go NewWatchers(b.watching.watcher).Watch(events)
 				}
 			} else {
 				children, stat, err = conn.Children(path)

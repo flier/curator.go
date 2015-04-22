@@ -59,7 +59,7 @@ func (b *checkExistsBuilder) pathInForeground(path string) (*zk.Stat, error) {
 				exists, stat, events, err = conn.ExistsW(path)
 
 				if events != nil && b.watching.watcher != nil {
-					NewWatchers(b.watching.watcher).Watch(events)
+					go NewWatchers(b.watching.watcher).Watch(events)
 				}
 			} else {
 				exists, stat, err = conn.Exists(path)
