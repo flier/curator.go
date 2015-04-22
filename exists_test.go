@@ -16,7 +16,6 @@ type CheckExistsBuilderTestSuite struct {
 	dialer  *mockZookeeperDialer
 	builder *CuratorFrameworkBuilder
 	events  chan zk.Event
-	wg      sync.WaitGroup
 }
 
 func TestCheckExistsBuilder(t *testing.T) {
@@ -105,11 +104,13 @@ func (s *CheckExistsBuilderTestSuite) TestBackground() {
 	s.conn.On("Exists", "/parent").Return(true, nil, nil).Once()
 	s.conn.On("Exists", "/parent/child").Return(true, &zk.Stat{}, nil).Once()
 
-	s.wg.Add(1)
+	var wg sync.WaitGroup
+
+	wg.Add(1)
 
 	stat, err := client.CheckExists().InBackgroundWithCallbackAndContext(
 		func(client CuratorFramework, event CuratorEvent) error {
-			defer s.wg.Done()
+			defer wg.Done()
 
 			assert.Equal(s.T(), EXISTS, event.Type())
 			assert.Equal(s.T(), "/child", event.Path())
@@ -124,7 +125,44 @@ func (s *CheckExistsBuilderTestSuite) TestBackground() {
 	assert.Nil(s.T(), stat)
 	assert.NoError(s.T(), err)
 
-	s.wg.Wait()
+	wg.Wait()
+
+	assert.NoError(s.T(), client.Close())
+}
+
+func (s *CheckExistsBuilderTestSuite) TestWatcher() {
+	client := s.builder.Build()
+
+	assert.NoError(s.T(), client.Start())
+
+	events := make(chan zk.Event)
+
+	defer close(events)
+
+	s.conn.On("ExistsW", "/node").Return(true, &zk.Stat{}, events, nil).Once()
+
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+
+	stat, err := client.CheckExists().UsingWatcher(NewWatcher(func(event *zk.Event) {
+		defer wg.Done()
+
+		assert.NotNil(s.T(), event)
+		assert.Equal(s.T(), zk.EventNodeDeleted, event.Type)
+		assert.Equal(s.T(), "/node", event.Path)
+
+	})).ForPath("/node")
+
+	assert.NotNil(s.T(), stat)
+	assert.NoError(s.T(), err)
+
+	events <- zk.Event{
+		Type: zk.EventNodeDeleted,
+		Path: "/node",
+	}
+
+	wg.Wait()
 
 	assert.NoError(s.T(), client.Close())
 }
