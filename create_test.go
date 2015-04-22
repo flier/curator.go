@@ -10,7 +10,7 @@ import (
 )
 
 type CreateBuilderTestSuite struct {
-	mockClientTestSuite
+	mockContainerTestSuite
 }
 
 func TestCreateBuilder(t *testing.T) {
@@ -18,7 +18,7 @@ func TestCreateBuilder(t *testing.T) {
 }
 
 func (s *CreateBuilderTestSuite) TestCreate() {
-	s.WithClient(func(builder *CuratorFrameworkBuilder, client CuratorFramework, conn *mockConn) {
+	s.With(func(builder *CuratorFrameworkBuilder, client CuratorFramework, conn *mockConn) {
 		acls := zk.WorldACL(zk.PermAll)
 
 		conn.On("Create", "/node", builder.DefaultData, int32(EPHEMERAL), acls).Return("/node", nil).Once()
@@ -31,7 +31,7 @@ func (s *CreateBuilderTestSuite) TestCreate() {
 }
 
 func (s *CreateBuilderTestSuite) TestNamespace() {
-	s.WithClientAndNamespace("parent", func(builder *CuratorFrameworkBuilder, client CuratorFramework, conn *mockConn) {
+	s.WithNamespace("parent", func(builder *CuratorFrameworkBuilder, client CuratorFramework, conn *mockConn) {
 		acls := zk.WorldACL(zk.PermAll)
 
 		conn.On("Exists", "/parent").Return(false, nil, nil).Once()
@@ -46,7 +46,7 @@ func (s *CreateBuilderTestSuite) TestNamespace() {
 }
 
 func (s *CreateBuilderTestSuite) TestBackground() {
-	s.WithClientAndNamespace("parent", func(client CuratorFramework, conn *mockConn, wg *sync.WaitGroup) {
+	s.WithNamespace("parent", func(client CuratorFramework, conn *mockConn, wg *sync.WaitGroup) {
 		data := []byte("data")
 		acls := zk.AuthACL(zk.PermRead)
 		ctxt := "context"
@@ -75,7 +75,7 @@ func (s *CreateBuilderTestSuite) TestBackground() {
 }
 
 func (s *CreateBuilderTestSuite) TestCompression() {
-	s.WithClient(func(client CuratorFramework, conn *mockConn, compress *mockCompressionProvider) {
+	s.With(func(client CuratorFramework, conn *mockConn, compress *mockCompressionProvider) {
 		data := []byte("data")
 		compressedData := []byte("compressedData")
 		acls := zk.WorldACL(zk.PermAll)
@@ -91,7 +91,7 @@ func (s *CreateBuilderTestSuite) TestCompression() {
 }
 
 func (s *CreateBuilderTestSuite) TestCreateParents() {
-	s.WithClient(func(builder *CuratorFrameworkBuilder, client CuratorFramework, conn *mockConn) {
+	s.With(func(builder *CuratorFrameworkBuilder, client CuratorFramework, conn *mockConn) {
 		conn.On("Create", "/parent/child", builder.DefaultData, int32(PERSISTENT), []zk.ACL(nil)).Return("", zk.ErrNoNode).Once()
 		conn.On("Exists", "/parent").Return(false, nil, nil).Once()
 		conn.On("Create", "/parent", []byte{}, int32(PERSISTENT), zk.WorldACL(zk.PermAll)).Return("/parent", nil).Once()

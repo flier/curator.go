@@ -9,7 +9,7 @@ import (
 )
 
 func TestTransaction(t *testing.T) {
-	newMockZookeeperClient().WithNamespace("parent").Test(t, func(client CuratorFramework, conn *mockConn, compress *mockCompressionProvider) {
+	newMockContainer().WithNamespace("parent").Test(t, func(client CuratorFramework, conn *mockConn, compress *mockCompressionProvider) {
 		acls := zk.AuthACL(zk.PermRead)
 
 		compress.On("Compress", "/node1", []byte("default")).Return([]byte("compressed(default)"), nil).Once()

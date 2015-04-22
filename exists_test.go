@@ -10,7 +10,7 @@ import (
 )
 
 type CheckExistsBuilderTestSuite struct {
-	mockClientTestSuite
+	mockContainerTestSuite
 }
 
 func TestCheckExistsBuilder(t *testing.T) {
@@ -18,7 +18,7 @@ func TestCheckExistsBuilder(t *testing.T) {
 }
 
 func (s *CheckExistsBuilderTestSuite) TestCheckExists() {
-	s.WithClient(func(client CuratorFramework, conn *mockConn) {
+	s.With(func(client CuratorFramework, conn *mockConn) {
 		conn.On("Exists", "/node").Return(true, &zk.Stat{}, nil).Once()
 
 		stat, err := client.CheckExists().ForPath("/node")
@@ -27,7 +27,7 @@ func (s *CheckExistsBuilderTestSuite) TestCheckExists() {
 		assert.NoError(s.T(), err)
 	})
 
-	s.WithClient(func(client CuratorFramework, conn *mockConn) {
+	s.With(func(client CuratorFramework, conn *mockConn) {
 		conn.On("Exists", "/node").Return(false, nil, nil).Once()
 
 		stat, err := client.CheckExists().ForPath("/node")
@@ -36,7 +36,7 @@ func (s *CheckExistsBuilderTestSuite) TestCheckExists() {
 		assert.EqualError(s.T(), err, zk.ErrNoNode.Error())
 	})
 
-	s.WithClient(func(client CuratorFramework, conn *mockConn) {
+	s.With(func(client CuratorFramework, conn *mockConn) {
 		conn.On("Exists", "/node").Return(false, nil, zk.ErrAPIError).Once()
 
 		stat, err := client.CheckExists().ForPath("/node")
@@ -47,7 +47,7 @@ func (s *CheckExistsBuilderTestSuite) TestCheckExists() {
 }
 
 func (s *CheckExistsBuilderTestSuite) TestNamespace() {
-	s.WithClientAndNamespace("parent", func(client CuratorFramework, conn *mockConn) {
+	s.WithNamespace("parent", func(client CuratorFramework, conn *mockConn) {
 		conn.On("Exists", "/parent").Return(true, nil, nil).Once()
 		conn.On("Exists", "/parent/child").Return(false, nil, nil).Once()
 
@@ -59,7 +59,7 @@ func (s *CheckExistsBuilderTestSuite) TestNamespace() {
 }
 
 func (s *CheckExistsBuilderTestSuite) TestBackground() {
-	s.WithClientAndNamespace("parent", func(client CuratorFramework, conn *mockConn, wg *sync.WaitGroup) {
+	s.WithNamespace("parent", func(client CuratorFramework, conn *mockConn, wg *sync.WaitGroup) {
 		ctxt := "context"
 
 		conn.On("Exists", "/parent").Return(true, nil, nil).Once()
@@ -85,7 +85,7 @@ func (s *CheckExistsBuilderTestSuite) TestBackground() {
 }
 
 func (s *CheckExistsBuilderTestSuite) TestWatcher() {
-	s.WithClient(func(client CuratorFramework, conn *mockConn, wg *sync.WaitGroup) {
+	s.With(func(client CuratorFramework, conn *mockConn, wg *sync.WaitGroup) {
 		events := make(chan zk.Event)
 
 		defer close(events)

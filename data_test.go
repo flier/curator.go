@@ -10,7 +10,7 @@ import (
 )
 
 type GetDataBuilderTestSuite struct {
-	mockClientTestSuite
+	mockContainerTestSuite
 }
 
 func TestGetDataBuilder(t *testing.T) {
@@ -18,7 +18,7 @@ func TestGetDataBuilder(t *testing.T) {
 }
 
 func (s *GetDataBuilderTestSuite) TestGetData() {
-	s.WithClient(func(builder *CuratorFrameworkBuilder, client CuratorFramework, conn *mockConn, compress *mockCompressionProvider) {
+	s.With(func(builder *CuratorFrameworkBuilder, client CuratorFramework, conn *mockConn, compress *mockCompressionProvider) {
 		conn.On("Get", "/node").Return([]byte("compressed(data)"), &zk.Stat{Version: 1}, nil).Once()
 		compress.On("Decompress", "/node", []byte("compressed(data)")).Return([]byte("data"), nil).Once()
 
@@ -33,7 +33,7 @@ func (s *GetDataBuilderTestSuite) TestGetData() {
 }
 
 func (s *GetDataBuilderTestSuite) TestNamespace() {
-	s.WithClientAndNamespace("parent", func(client CuratorFramework, conn *mockConn) {
+	s.WithNamespace("parent", func(client CuratorFramework, conn *mockConn) {
 		conn.On("Exists", "/parent").Return(true, nil, nil).Once()
 		conn.On("Get", "/parent/child").Return([]byte("data"), (*zk.Stat)(nil), nil).Once()
 
@@ -45,7 +45,7 @@ func (s *GetDataBuilderTestSuite) TestNamespace() {
 }
 
 func (s *GetDataBuilderTestSuite) TestBackground() {
-	s.WithClientAndNamespace("parent", func(client CuratorFramework, conn *mockConn, wg *sync.WaitGroup) {
+	s.WithNamespace("parent", func(client CuratorFramework, conn *mockConn, wg *sync.WaitGroup) {
 		data := []byte("data")
 		ctxt := "context"
 
@@ -71,7 +71,7 @@ func (s *GetDataBuilderTestSuite) TestBackground() {
 }
 
 func (s *GetDataBuilderTestSuite) TestWatcher() {
-	s.WithClient(func(client CuratorFramework, conn *mockConn, wg *sync.WaitGroup) {
+	s.With(func(client CuratorFramework, conn *mockConn, wg *sync.WaitGroup) {
 		events := make(chan zk.Event)
 
 		defer close(events)
@@ -97,7 +97,7 @@ func (s *GetDataBuilderTestSuite) TestWatcher() {
 }
 
 type SetDataBuilderTestSuite struct {
-	mockClientTestSuite
+	mockContainerTestSuite
 }
 
 func TestSetDataBuilder(t *testing.T) {
