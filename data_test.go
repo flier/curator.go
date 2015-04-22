@@ -103,3 +103,57 @@ type SetDataBuilderTestSuite struct {
 func TestSetDataBuilder(t *testing.T) {
 	suite.Run(t, new(SetDataBuilderTestSuite))
 }
+
+func (s *SetDataBuilderTestSuite) TestSetData() {
+	s.With(func(builder *CuratorFrameworkBuilder, client CuratorFramework, conn *mockConn, compress *mockCompressionProvider) {
+		compress.On("Compress", "/node", []byte("data")).Return([]byte("compressed(data)"), nil).Once()
+		conn.On("Set", "/node", []byte("compressed(data)"), int32(3)).Return(&zk.Stat{Version: 4}, nil).Once()
+
+		stat, err := client.SetData().WithVersion(3).Compressed().ForPathWithData("/node", []byte("data"))
+
+		assert.NotNil(s.T(), stat)
+		assert.Equal(s.T(), 4, stat.Version)
+		assert.NoError(s.T(), err)
+	})
+}
+
+func (s *SetDataBuilderTestSuite) TestNamespace() {
+	s.WithNamespace("parent", func(client CuratorFramework, conn *mockConn) {
+		data := []byte("data")
+
+		conn.On("Exists", "/parent").Return(true, nil, nil).Once()
+		conn.On("Set", "/parent/child", data, int32(-1)).Return(&zk.Stat{Version: 5}, nil).Once()
+
+		stat, err := client.SetData().ForPathWithData("/child", data)
+
+		assert.NotNil(s.T(), stat)
+		assert.Equal(s.T(), 5, stat.Version)
+		assert.NoError(s.T(), err)
+	})
+}
+
+func (s *SetDataBuilderTestSuite) TestBackground() {
+	s.WithNamespace("parent", func(client CuratorFramework, conn *mockConn, wg *sync.WaitGroup) {
+		data := []byte("data")
+		ctxt := "context"
+
+		conn.On("Exists", "/parent").Return(true, nil, nil).Once()
+		conn.On("Set", "/parent/child", data, int32(-1)).Return((*zk.Stat)(nil), zk.ErrAPIError).Once()
+
+		_, err := client.SetData().InBackgroundWithCallbackAndContext(
+			func(client CuratorFramework, event CuratorEvent) error {
+				defer wg.Done()
+
+				assert.Equal(s.T(), SET_DATA, event.Type())
+				assert.Equal(s.T(), "/child", event.Path())
+				assert.Equal(s.T(), data, event.Data())
+				assert.EqualError(s.T(), event.Err(), zk.ErrAPIError.Error())
+				assert.Equal(s.T(), "child", event.Name())
+				assert.Equal(s.T(), ctxt, event.Context())
+
+				return nil
+			}, ctxt).ForPathWithData("/child", data)
+
+		assert.NoError(s.T(), err)
+	})
+}

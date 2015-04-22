@@ -164,8 +164,13 @@ func (c *mockConn) Get(path string) ([]byte, *zk.Stat, error) {
 
 	data, _ := args.Get(0).([]byte)
 	stat, _ := args.Get(1).(*zk.Stat)
+	err := args.Error(2)
 
-	return data, stat, args.Error(2)
+	if c.log != nil {
+		c.log("Get(path=\"%s\")(data=%v, stat=%v, error=%v)", path, data, stat, err)
+	}
+
+	return data, stat, err
 }
 
 func (c *mockConn) GetW(path string) ([]byte, *zk.Stat, <-chan zk.Event, error) {
@@ -174,16 +179,26 @@ func (c *mockConn) GetW(path string) ([]byte, *zk.Stat, <-chan zk.Event, error) 
 	data, _ := args.Get(0).([]byte)
 	stat, _ := args.Get(1).(*zk.Stat)
 	events, _ := args.Get(2).(chan zk.Event)
+	err := args.Error(3)
 
-	return data, stat, events, args.Error(3)
+	if c.log != nil {
+		c.log("GetW(path=\"%s\")(data=%v, stat=%v, events=%p, error=%v)", path, data, stat, err)
+	}
+
+	return data, stat, events, err
 }
 
 func (c *mockConn) Set(path string, data []byte, version int32) (*zk.Stat, error) {
 	args := c.Called(path, data, version)
 
 	stat, _ := args.Get(0).(*zk.Stat)
+	err := args.Error(1)
 
-	return stat, args.Error(1)
+	if c.log != nil {
+		c.log("Set(path=\"%s\", data=%v, version=%d) (stat=%v, error=%v)", path, data, version, stat, err)
+	}
+
+	return stat, err
 }
 
 func (c *mockConn) Children(path string) ([]string, *zk.Stat, error) {
@@ -373,12 +388,12 @@ func (h *mockEnsurePathHelper) Ensure(client *CuratorZookeeperClient, path strin
 	return err
 }
 
-type mockZookeeperClient struct {
+type mockContainer struct {
 	builder *CuratorFrameworkBuilder
 }
 
-func newMockZookeeperClient() *mockZookeeperClient {
-	return &mockZookeeperClient{
+func newMockContainer() *mockContainer {
+	return &mockContainer{
 		builder: &CuratorFrameworkBuilder{
 			SessionTimeout:    DEFAULT_SESSION_TIMEOUT,
 			ConnectionTimeout: DEFAULT_CONNECTION_TIMEOUT,
@@ -388,19 +403,19 @@ func newMockZookeeperClient() *mockZookeeperClient {
 	}
 }
 
-func (c *mockZookeeperClient) Prepare(callback func(builder *CuratorFrameworkBuilder)) *mockZookeeperClient {
+func (c *mockContainer) Prepare(callback func(builder *CuratorFrameworkBuilder)) *mockContainer {
 	callback(c.builder)
 
 	return c
 }
 
-func (c *mockZookeeperClient) WithNamespace(namespace string) *mockZookeeperClient {
+func (c *mockContainer) WithNamespace(namespace string) *mockContainer {
 	c.builder.Namespace = namespace
 
 	return c
 }
 
-func (c *mockZookeeperClient) Test(t *testing.T, callback interface{}) {
+func (c *mockContainer) Test(t *testing.T, callback interface{}) {
 	var client CuratorFramework
 	var events chan zk.Event
 	var wg *sync.WaitGroup
@@ -522,14 +537,18 @@ func (c *mockZookeeperClient) Test(t *testing.T, callback interface{}) {
 	aclProvider.AssertExpectations(t)
 }
 
-type mockClientTestSuite struct {
+type mockContainerTestSuite struct {
 	suite.Suite
 }
 
-func (s *mockClientTestSuite) WithClient(callback interface{}) {
-	newMockZookeeperClient().Test(s.T(), callback)
+func (s *mockContainerTestSuite) With(callback interface{}) {
+	newMockContainer().Test(s.T(), callback)
 }
 
-func (s *mockClientTestSuite) WithClientAndNamespace(namespace string, callback interface{}) {
-	newMockZookeeperClient().WithNamespace(namespace).Test(s.T(), callback)
+func (s *mockContainerTestSuite) WithNamespace(namespace string, callback interface{}) {
+	newMockContainer().WithNamespace(namespace).Test(s.T(), callback)
+}
+
+func (s *mockContainerTestSuite) WithPrepare(prepare func(*CuratorFrameworkBuilder), callback interface{}) {
+	newMockContainer().Prepare(prepare).Test(s.T(), callback)
 }
