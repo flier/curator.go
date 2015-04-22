@@ -60,7 +60,7 @@ func (b *createBuilder) pathInBackground(path string, payload []byte, givenPath 
 			event.path = givenPath
 		}
 
-		event.name = GetNodeFromPath(createdPath)
+		event.name = GetNodeFromPath(event.path)
 
 		b.backgrounding.callback(b.client, event)
 	}

@@ -12,13 +12,12 @@ import (
 type CreateBuilderTestSuite struct {
 	suite.Suite
 
-	conn        *mockConn
-	dialer      *mockZookeeperDialer
-	compress    *mockCompressionProvider
-	aclProvider *mockACLProvider
-	builder     *CuratorFrameworkBuilder
-	events      chan zk.Event
-	wg          sync.WaitGroup
+	conn     *mockConn
+	dialer   *mockZookeeperDialer
+	compress *mockCompressionProvider
+	builder  *CuratorFrameworkBuilder
+	events   chan zk.Event
+	wg       sync.WaitGroup
 }
 
 func TestCreateBuilder(t *testing.T) {
@@ -113,6 +112,7 @@ func (s *CreateBuilderTestSuite) TestBackground() {
 			assert.Equal(s.T(), data, event.Data())
 			assert.Equal(s.T(), acls, event.ACLs())
 			assert.EqualError(s.T(), event.Err(), zk.ErrAPIError.Error())
+			assert.Equal(s.T(), "child", event.Name())
 			assert.Equal(s.T(), ctxt, event.Context())
 
 			return nil

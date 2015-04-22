@@ -104,6 +104,7 @@ func (s *DeleteBuilderTestSuite) TestBackground() {
 			assert.Equal(s.T(), DELETE, event.Type())
 			assert.Equal(s.T(), "/child", event.Path())
 			assert.NoError(s.T(), event.Err())
+			assert.Equal(s.T(), "child", event.Name())
 			assert.Equal(s.T(), ctxt, event.Context())
 
 			return nil
