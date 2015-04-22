@@ -67,3 +67,65 @@ func (s *DeleteBuilderTestSuite) TestDeleteWithVersion() {
 
 	assert.NoError(s.T(), client.Close())
 }
+
+func (s *DeleteBuilderTestSuite) TestNamespace() {
+	s.builder.Namespace = "parent"
+
+	client := s.builder.Build()
+
+	assert.NoError(s.T(), client.Start())
+
+	s.conn.On("Exists", "/parent").Return(true, nil, nil).Once()
+	s.conn.On("Delete", "/parent/child", -1).Return(nil).Once()
+
+	assert.NoError(s.T(), client.Delete().ForPath("/child"))
+
+	assert.NoError(s.T(), client.Close())
+}
+
+func (s *DeleteBuilderTestSuite) TestBackground() {
+	s.builder.Namespace = "parent"
+
+	client := s.builder.Build()
+
+	assert.NoError(s.T(), client.Start())
+
+	ctxt := "context"
+
+	s.conn.On("Exists", "/parent").Return(true, nil, nil).Once()
+	s.conn.On("Delete", "/parent/child", -1).Return(nil).Once()
+
+	s.wg.Add(1)
+
+	assert.NoError(s.T(), client.Delete().InBackgroundWithCallbackAndContext(
+		func(client CuratorFramework, event CuratorEvent) error {
+			defer s.wg.Done()
+
+			assert.Equal(s.T(), DELETE, event.Type())
+			assert.Equal(s.T(), "/child", event.Path())
+			assert.NoError(s.T(), event.Err())
+			assert.Equal(s.T(), ctxt, event.Context())
+
+			return nil
+		}, ctxt).ForPath("/child"))
+
+	s.wg.Wait()
+
+	assert.NoError(s.T(), client.Close())
+}
+
+func (s *DeleteBuilderTestSuite) TestDeletingChildren() {
+	client := s.builder.Build()
+
+	assert.NoError(s.T(), client.Start())
+
+	s.conn.On("Delete", "/parent", -1).Return(zk.ErrNotEmpty).Once()
+	s.conn.On("Children", "/parent").Return([]string{"child"}, nil, nil).Once()
+	s.conn.On("Children", "/parent/child").Return([]string{}, nil, nil).Once()
+	s.conn.On("Delete", "/parent/child", -1).Return(nil).Once()
+	s.conn.On("Delete", "/parent", -1).Return(nil).Once()
+
+	assert.NoError(s.T(), client.Delete().DeletingChildrenIfNeeded().ForPath("/parent"))
+
+	assert.NoError(s.T(), client.Close())
+}

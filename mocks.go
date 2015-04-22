@@ -155,8 +155,13 @@ func (c *mockConn) Children(path string) ([]string, *zk.Stat, error) {
 
 	children, _ := args.Get(0).([]string)
 	stat, _ := args.Get(1).(*zk.Stat)
+	err := args.Error(2)
 
-	return children, stat, args.Error(2)
+	if c.log != nil {
+		c.log("Children(path=\"%s\")(children=%v, stat=%v, error=%v)", path, children, stat, err)
+	}
+
+	return children, stat, err
 }
 
 func (c *mockConn) ChildrenW(path string) ([]string, *zk.Stat, <-chan zk.Event, error) {
@@ -165,8 +170,13 @@ func (c *mockConn) ChildrenW(path string) ([]string, *zk.Stat, <-chan zk.Event, 
 	children, _ := args.Get(0).([]string)
 	stat, _ := args.Get(1).(*zk.Stat)
 	events, _ := args.Get(2).(chan zk.Event)
+	err := args.Error(3)
 
-	return children, stat, events, args.Error(3)
+	if c.log != nil {
+		c.log("ChildrenW(path=\"%s\")(children=%v, stat=%v, events=%v, error=%v)", path, children, stat, events, err)
+	}
+
+	return children, stat, events, err
 }
 
 func (c *mockConn) GetACL(path string) ([]zk.ACL, *zk.Stat, error) {
