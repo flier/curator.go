@@ -20,3 +20,14 @@ func (m CreateMode) IsEphemeral() bool  { return (m & zk.FlagEphemeral) == zk.Fl
 
 // Called when the async background operation completes
 type BackgroundCallback func(client CuratorFramework, event CuratorEvent) error
+
+type backgrounding struct {
+	inBackground bool
+	context      interface{}
+	callback     BackgroundCallback
+}
+
+type watching struct {
+	watcher Watcher
+	watched bool
+}

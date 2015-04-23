@@ -361,19 +361,3 @@ type TransactionCheckBuilder interface {
 	// Use the given version (the default is -1)
 	WithVersion(version int32) TransactionCheckBuilder
 }
-
-type acling struct {
-	aclList     []zk.ACL
-	aclProvider ACLProvider
-}
-
-type backgrounding struct {
-	inBackground bool
-	context      interface{}
-	callback     BackgroundCallback
-}
-
-type watching struct {
-	watcher Watcher
-	watched bool
-}

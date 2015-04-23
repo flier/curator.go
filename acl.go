@@ -4,6 +4,12 @@ import (
 	"github.com/samuel/go-zookeeper/zk"
 )
 
+var (
+	OPEN_ACL_UNSAFE = zk.WorldACL(zk.PermAll)
+	CREATOR_ALL_ACL = zk.AuthACL(zk.PermAll)
+	READ_ACL_UNSAFE = zk.WorldACL(zk.PermRead)
+)
+
 type ACLProvider interface {
 	// Return the ACL list to use by default
 	GetDefaultAcl() []zk.ACL
@@ -25,7 +31,26 @@ func (p *defaultACLProvider) GetAclForPath(path string) []zk.ACL {
 }
 
 func NewDefaultACLProvider() ACLProvider {
-	return &defaultACLProvider{zk.WorldACL(zk.PermAll)}
+	return &defaultACLProvider{OPEN_ACL_UNSAFE}
+}
+
+type acling struct {
+	aclList     []zk.ACL
+	aclProvider ACLProvider
+}
+
+func (a *acling) getAclList(path string) []zk.ACL {
+	if a.aclList != nil {
+		return a.aclList
+	}
+
+	if len(path) > 0 {
+		if acls := a.aclProvider.GetAclForPath(path); acls != nil {
+			return acls
+		}
+	}
+
+	return a.aclProvider.GetDefaultAcl()
 }
 
 type getACLBuilder struct {
@@ -156,7 +181,7 @@ func (b *setACLBuilder) pathInBackground(path string, givenPath string) {
 			eventType: SET_ACL,
 			err:       err,
 			path:      b.client.unfixForNamespace(path),
-			acls:      b.acling.aclList,
+			acls:      b.acling.getAclList(path),
 			stat:      stat,
 			context:   b.backgrounding.context,
 		}
@@ -178,7 +203,7 @@ func (b *setACLBuilder) pathInForeground(path string) (*zk.Stat, error) {
 		if conn, err := zkClient.Conn(); err != nil {
 			return nil, err
 		} else {
-			return conn.SetACL(path, b.acling.aclList, b.version)
+			return conn.SetACL(path, b.acling.getAclList(path), b.version)
 		}
 	})
 
@@ -188,7 +213,7 @@ func (b *setACLBuilder) pathInForeground(path string) (*zk.Stat, error) {
 }
 
 func (b *setACLBuilder) WithACL(acls ...zk.ACL) SetACLBuilder {
-	b.acling = acling{aclList: acls, aclProvider: b.client.aclProvider}
+	b.acling.aclList = acls
 
 	return b
 }
