@@ -76,7 +76,7 @@ func TestMakeDirs(t *testing.T) {
 
 	conn.On("Exists", "/parent").Return(true, nil, nil).Once()
 	conn.On("Exists", "/parent/child").Return(false, nil, nil).Once()
-	conn.On("Create", "/parent/child", []byte{}, int32(PERSISTENT), zk.WorldACL(zk.PermAll)).Return("", nil).Once()
+	conn.On("Create", "/parent/child", []byte{}, int32(PERSISTENT), OPEN_ACL_UNSAFE).Return("", nil).Once()
 
 	assert.NoError(t, MakeDirs(conn, "/parent/child/node", false, nil))
 
@@ -96,7 +96,7 @@ func TestMakeDirs(t *testing.T) {
 
 	conn.On("Exists", "/parent").Return(true, nil, nil).Once()
 	conn.On("Exists", "/parent/child").Return(false, nil, nil).Once()
-	conn.On("Create", "/parent/child", []byte{}, int32(PERSISTENT), zk.WorldACL(zk.PermAll)).Return("", zk.ErrNodeExists).Once()
+	conn.On("Create", "/parent/child", []byte{}, int32(PERSISTENT), OPEN_ACL_UNSAFE).Return("", zk.ErrNodeExists).Once()
 
 	assert.NoError(t, MakeDirs(conn, "/parent/child/node", false, nil))
 

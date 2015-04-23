@@ -323,12 +323,18 @@ func (p *mockCompressionProvider) Decompress(path string, compressedData []byte)
 
 type mockACLProvider struct {
 	mock.Mock
+
+	log infof
 }
 
 func (p *mockACLProvider) GetDefaultAcl() []zk.ACL {
 	args := p.Called()
 
 	acls, _ := args.Get(0).([]zk.ACL)
+
+	if p.log != nil {
+		p.log("GetDefaultAcl()(acls=%v)", acls)
+	}
 
 	return acls
 }
@@ -337,6 +343,10 @@ func (p *mockACLProvider) GetAclForPath(path string) []zk.ACL {
 	args := p.Called(path)
 
 	acls, _ := args.Get(0).([]zk.ACL)
+
+	if p.log != nil {
+		p.log("GetAclForPath(path=\"%s\")(acls=%v)", path, acls)
+	}
 
 	return acls
 }
@@ -426,7 +436,7 @@ func (c *mockContainer) Test(t *testing.T, callback interface{}) {
 	ensembleProvider := &mockEnsembleProvider{}
 	compressionProvider := &mockCompressionProvider{log: t.Logf}
 	retryPolicy := &mockRetryPolicy{log: t.Logf}
-	aclProvider := &mockACLProvider{}
+	aclProvider := &mockACLProvider{log: t.Logf}
 
 	data := []byte("data")
 	version := rand.Int31()

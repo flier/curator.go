@@ -169,7 +169,7 @@ func MakeDirs(conn ZookeeperConnection, path string, makeLastNode bool, aclProvi
 			}
 
 			if acls == nil {
-				acls = zk.WorldACL(zk.PermAll)
+				acls = OPEN_ACL_UNSAFE
 			}
 
 			if _, err := conn.Create(subPath, []byte{}, int32(PERSISTENT), acls); err != nil && err != zk.ErrNodeExists {

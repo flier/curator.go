@@ -31,7 +31,7 @@ func (s *CreateBuilderTestSuite) TestCreate() {
 func (s *CreateBuilderTestSuite) TestNamespace() {
 	s.WithNamespace("parent", func(builder *CuratorFrameworkBuilder, client CuratorFramework, conn *mockConn, acls []zk.ACL) {
 		conn.On("Exists", "/parent").Return(false, nil, nil).Once()
-		conn.On("Create", "/parent", []byte{}, int32(PERSISTENT), acls).Return("/parent", nil).Once()
+		conn.On("Create", "/parent", []byte{}, int32(PERSISTENT), OPEN_ACL_UNSAFE).Return("/parent", nil).Once()
 		conn.On("Create", "/parent/child", builder.DefaultData, int32(EPHEMERAL), acls).Return("/parent/child", nil).Once()
 
 		path, err := client.Create().WithMode(EPHEMERAL).WithACL(acls...).ForPath("/child")
@@ -83,15 +83,17 @@ func (s *CreateBuilderTestSuite) TestCompression() {
 }
 
 func (s *CreateBuilderTestSuite) TestCreateParents() {
-	s.With(func(builder *CuratorFrameworkBuilder, client CuratorFramework, conn *mockConn) {
-		conn.On("Create", "/parent/child", builder.DefaultData, int32(PERSISTENT), []zk.ACL(nil)).Return("", zk.ErrNoNode).Once()
+	s.With(func(builder *CuratorFrameworkBuilder, client CuratorFramework, conn *mockConn, data []byte, aclProvider *mockACLProvider, acls []zk.ACL) {
+		aclProvider.On("GetAclForPath", "/parent/child").Return(READ_ACL_UNSAFE).Once()
+		conn.On("Create", "/parent/child", data, int32(PERSISTENT), READ_ACL_UNSAFE).Return("", zk.ErrNoNode).Once()
+
 		conn.On("Exists", "/parent").Return(false, nil, nil).Once()
-		conn.On("Create", "/parent", []byte{}, int32(PERSISTENT), zk.WorldACL(zk.PermAll)).Return("/parent", nil).Once()
-		conn.On("Create", "/parent/child", builder.DefaultData, int32(PERSISTENT), []zk.ACL(nil)).Return("/parent/child", nil).Once()
+		aclProvider.On("GetAclForPath", "/parent").Return(CREATOR_ALL_ACL).Once()
+		conn.On("Create", "/parent", []byte{}, int32(PERSISTENT), CREATOR_ALL_ACL).Return("", zk.ErrAPIError).Once()
 
-		path, err := client.Create().CreatingParentsIfNeeded().ForPath("/parent/child")
+		path, err := client.Create().CreatingParentsIfNeeded().ForPathWithData("/parent/child", data)
 
-		assert.Equal(s.T(), "/parent/child", path)
-		assert.NoError(s.T(), err)
+		assert.Equal(s.T(), "", path)
+		assert.Equal(s.T(), err, zk.ErrAPIError)
 	})
 }
