@@ -23,7 +23,7 @@ func CheckExists(client curator.CuratorFramework, path string) (*zk.Stat, error)
 	return client.CheckExists().UsingWatcher(watcher).ForPath(path)
 }
 
-func Delete(client curator.CuratorFramework, path string, version int) error {
+func Delete(client curator.CuratorFramework, path string, version int32) error {
 	return client.Delete().DeletingChildrenIfNeeded().WithVersion(version).ForPath(path)
 }
 
@@ -49,7 +49,7 @@ func SetDataAsync(client curator.CuratorFramework, path string, payload []byte) 
 	})
 
 	// this is one method of getting event/async notifications
-	client.CuratorListenable().Add(listener)
+	client.CuratorListenable().AddListener(listener)
 
 	// set data for the given node asynchronously. The completion notification
 	// is done via the CuratorListener.

@@ -164,7 +164,7 @@ func (v *distributedAtomicValue) CompareAndSet(expectedValue, newValue []byte) (
 	if createIt, err := v.currentValue(&result, &stat); err != nil {
 		return nil, err
 	} else if !createIt && bytes.Equal(expectedValue, result.preValue) {
-		if _, err := v.client.SetData().WithVersion(int(stat.Version)).ForPathWithData(v.path, newValue); err == nil {
+		if _, err := v.client.SetData().WithVersion(stat.Version).ForPathWithData(v.path, newValue); err == nil {
 			result.succeeded = true
 			result.postValue = newValue
 		} else if err == zk.ErrBadVersion || err == zk.ErrNoNode {
@@ -252,7 +252,7 @@ func (v *distributedAtomicValue) tryOnce(result *mutableAtomicValue, newValue []
 		if createIt {
 			_, err = v.client.Create().ForPathWithData(v.path, newValue)
 		} else {
-			_, err = v.client.SetData().WithVersion(int(stat.Version)).ForPathWithData(v.path, newValue)
+			_, err = v.client.SetData().WithVersion(stat.Version).ForPathWithData(v.path, newValue)
 		}
 
 		if err == nil {
