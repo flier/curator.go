@@ -18,9 +18,7 @@ func TestCreateBuilder(t *testing.T) {
 }
 
 func (s *CreateBuilderTestSuite) TestCreate() {
-	s.With(func(builder *CuratorFrameworkBuilder, client CuratorFramework, conn *mockConn) {
-		acls := zk.WorldACL(zk.PermAll)
-
+	s.With(func(builder *CuratorFrameworkBuilder, client CuratorFramework, conn *mockConn, acls []zk.ACL) {
 		conn.On("Create", "/node", builder.DefaultData, int32(EPHEMERAL), acls).Return("/node", nil).Once()
 
 		path, err := client.Create().WithMode(EPHEMERAL).WithACL(acls...).ForPath("/node")
@@ -31,9 +29,7 @@ func (s *CreateBuilderTestSuite) TestCreate() {
 }
 
 func (s *CreateBuilderTestSuite) TestNamespace() {
-	s.WithNamespace("parent", func(builder *CuratorFrameworkBuilder, client CuratorFramework, conn *mockConn) {
-		acls := zk.WorldACL(zk.PermAll)
-
+	s.WithNamespace("parent", func(builder *CuratorFrameworkBuilder, client CuratorFramework, conn *mockConn, acls []zk.ACL) {
 		conn.On("Exists", "/parent").Return(false, nil, nil).Once()
 		conn.On("Create", "/parent", []byte{}, int32(PERSISTENT), acls).Return("/parent", nil).Once()
 		conn.On("Create", "/parent/child", builder.DefaultData, int32(EPHEMERAL), acls).Return("/parent/child", nil).Once()
