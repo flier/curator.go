@@ -52,7 +52,7 @@ func (b *createBuilder) pathInBackground(path string, payload []byte, givenPath 
 			err:       err,
 			path:      createdPath,
 			data:      payload,
-			acls:      b.acling.aclList,
+			acls:      b.acling.getAclList(path),
 			context:   b.backgrounding.context,
 		}
 
@@ -73,12 +73,14 @@ func (b *createBuilder) pathInForeground(path string, payload []byte) (string, e
 		if conn, err := zkClient.Conn(); err != nil {
 			return nil, err
 		} else {
-			createdPath, err := conn.Create(path, payload, int32(b.createMode), b.acling.aclList)
+			createdPath, err := conn.Create(path, payload, int32(b.createMode), b.acling.getAclList(path))
 
 			if err == zk.ErrNoNode && b.createParentsIfNeeded {
-				MakeDirs(conn, path, false, b.acling.aclProvider)
+				if err := MakeDirs(conn, path, false, b.acling.aclProvider); err != nil {
+					return "", err
+				}
 
-				return conn.Create(path, payload, int32(b.createMode), b.acling.aclList)
+				return conn.Create(path, payload, int32(b.createMode), b.acling.getAclList(path))
 			} else {
 				return createdPath, err
 			}
@@ -103,7 +105,7 @@ func (b *createBuilder) WithMode(mode CreateMode) CreateBuilder {
 }
 
 func (b *createBuilder) WithACL(acls ...zk.ACL) CreateBuilder {
-	b.acling = acling{aclList: acls, aclProvider: b.client.aclProvider}
+	b.acling.aclList = acls
 
 	return b
 }

@@ -76,7 +76,7 @@ type curatorTransaction struct {
 }
 
 func (t *curatorTransaction) Create() TransactionCreateBuilder {
-	return &transactionCreateBuilder{transaction: t}
+	return &transactionCreateBuilder{transaction: t, acling: acling{aclProvider: t.client.aclProvider}}
 }
 
 func (t *curatorTransaction) Delete() TransactionDeleteBuilder {
@@ -163,7 +163,7 @@ func (b *transactionCreateBuilder) ForPathWithData(path string, payload []byte) 
 	b.transaction.operations = append(b.transaction.operations, &zk.CreateRequest{
 		Path:  b.transaction.client.fixForNamespace(path, false),
 		Data:  data,
-		Acl:   b.acling.aclList,
+		Acl:   b.acling.getAclList(path),
 		Flags: int32(b.createMode),
 	})
 
@@ -177,7 +177,7 @@ func (b *transactionCreateBuilder) WithMode(mode CreateMode) TransactionCreateBu
 }
 
 func (b *transactionCreateBuilder) WithACL(acls ...zk.ACL) TransactionCreateBuilder {
-	b.acling = acling{aclList: acls, aclProvider: b.transaction.client.aclProvider}
+	b.acling.aclList = acls
 
 	return b
 }

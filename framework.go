@@ -279,7 +279,7 @@ func (c *curatorFramework) Started() bool {
 func (c *curatorFramework) Create() CreateBuilder {
 	c.state.Check(STARTED, "instance must be started before calling this method")
 
-	return &createBuilder{client: c}
+	return &createBuilder{client: c, acling: acling{aclProvider: c.aclProvider}}
 }
 
 func (c *curatorFramework) Delete() DeleteBuilder {
@@ -321,7 +321,7 @@ func (c *curatorFramework) GetACL() GetACLBuilder {
 func (c *curatorFramework) SetACL() SetACLBuilder {
 	c.state.Check(STARTED, "instance must be started before calling this method")
 
-	return &setACLBuilder{client: c, version: AnyVersion}
+	return &setACLBuilder{client: c, version: AnyVersion, acling: acling{aclProvider: c.aclProvider}}
 }
 
 func (c *curatorFramework) InTransaction() Transaction {
