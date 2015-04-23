@@ -77,8 +77,12 @@ func (b *getDataBuilder) pathInForeground(path string) ([]byte, error) {
 				data, stat, err = conn.Get(path)
 			}
 
-			if stat != nil && b.stat != nil {
-				*b.stat = *stat
+			if stat != nil {
+				if b.stat != nil {
+					*b.stat = *stat
+				} else {
+					b.stat = stat
+				}
 			}
 
 			if b.decompress {

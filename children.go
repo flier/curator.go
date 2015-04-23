@@ -76,8 +76,12 @@ func (b *getChildrenBuilder) pathInForeground(path string) ([]string, error) {
 				children, stat, err = conn.Children(path)
 			}
 
-			if stat != nil && b.stat != nil {
-				*b.stat = *stat
+			if stat != nil {
+				if b.stat != nil {
+					*b.stat = *stat
+				} else {
+					b.stat = stat
+				}
 			}
 
 			return children, err

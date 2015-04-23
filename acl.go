@@ -107,8 +107,12 @@ func (b *getACLBuilder) pathInForeground(path string) ([]zk.ACL, error) {
 		} else {
 			acls, stat, err := conn.GetACL(path)
 
-			if stat != nil && b.stat != nil {
-				*b.stat = *stat
+			if stat != nil {
+				if b.stat != nil {
+					*b.stat = *stat
+				} else {
+					b.stat = stat
+				}
 			}
 
 			return acls, err
