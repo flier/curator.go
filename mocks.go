@@ -32,13 +32,23 @@ func (c *mockCloseable) Close() error {
 
 type mockTracerDriver struct {
 	mock.Mock
+
+	log infof
 }
 
 func (t *mockTracerDriver) AddTime(name string, d time.Duration) {
+	if t.log != nil {
+		t.log("AddTime(name=\"%s\", d=%v)", name, d)
+	}
+
 	t.Called(name, d)
 }
 
 func (t *mockTracerDriver) AddCount(name string, increment int) {
+	if t.log != nil {
+		t.log("AddCount(name=\"%s\", increment=%d)", name, increment)
+	}
+
 	t.Called(name, increment)
 }
 
@@ -72,13 +82,39 @@ func (r *mockRetryPolicy) AllowRetry(retryCount int, elapsedTime time.Duration, 
 
 type mockEnsembleProvider struct {
 	mock.Mock
+
+	log infof
 }
 
-func (p *mockEnsembleProvider) Start() error { return p.Called().Error(0) }
+func (p *mockEnsembleProvider) Start() error {
+	err := p.Called().Error(0)
 
-func (p *mockEnsembleProvider) Close() error { return p.Called().Error(0) }
+	if p.log != nil {
+		p.log("Start() error=%v", err)
+	}
 
-func (p *mockEnsembleProvider) ConnectionString() string { return p.Called().String(0) }
+	return err
+}
+
+func (p *mockEnsembleProvider) Close() error {
+	err := p.Called().Error(0)
+
+	if p.log != nil {
+		p.log("Close() error=%v", err)
+	}
+
+	return err
+}
+
+func (p *mockEnsembleProvider) ConnectionString() string {
+	connStr := p.Called().String(0)
+
+	if p.log != nil {
+		p.log("ConnectionString() \"%v\"", connStr)
+	}
+
+	return connStr
+}
 
 type mockConn struct {
 	mock.Mock
@@ -529,7 +565,7 @@ func (c *mockContainer) Test(t *testing.T, callback interface{}) {
 		}
 
 		if c.builder.ZookeeperDialer == zookeeperDialer {
-			zookeeperDialer.On("Dial", mock.AnythingOfType("string"), c.builder.ConnectionTimeout, c.builder.CanBeReadOnly).Return(zookeeperConnection, events, nil).Once()
+			zookeeperDialer.On("Dial", mock.AnythingOfType("string"), c.builder.SessionTimeout, c.builder.CanBeReadOnly).Return(zookeeperConnection, events, nil).Once()
 		}
 
 		assert.NoError(t, client.Start())
