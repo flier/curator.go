@@ -3,8 +3,235 @@ package curator
 import (
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"time"
+
+	"github.com/samuel/go-zookeeper/zk"
 )
+
+type zookeeperHelper interface {
+	GetConnectionString() string
+	GetZookeeperConnection() (ZookeeperConnection, error)
+}
+
+type zookeeperFactory struct {
+	holder *handleHolder
+}
+
+func (f *zookeeperFactory) GetConnectionString() string { return "" }
+func (f *zookeeperFactory) GetZookeeperConnection() (ZookeeperConnection, error) {
+	connectString := f.holder.ensembleProvider.ConnectionString()
+	conn, events, err := f.holder.zookeeperDialer.Dial(connectString, f.holder.sessionTimeout, f.holder.canBeReadOnly)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if events != nil {
+		go NewWatchers(f.holder.watcher).Watch(events)
+	}
+
+	f.holder.helper = &zookeeperCache{connectString, conn}
+
+	return conn, err
+}
+
+type zookeeperCache struct {
+	connnectString string
+	conn           ZookeeperConnection
+}
+
+func (c *zookeeperCache) GetConnectionString() string                          { return c.connnectString }
+func (c *zookeeperCache) GetZookeeperConnection() (ZookeeperConnection, error) { return c.conn, nil }
+
+type handleHolder struct {
+	zookeeperDialer  ZookeeperDialer
+	ensembleProvider EnsembleProvider
+	watcher          Watcher
+	sessionTimeout   time.Duration
+	canBeReadOnly    bool
+	helper           zookeeperHelper
+}
+
+func (h *handleHolder) getConnectionString() string {
+	if h.helper != nil {
+		return h.helper.GetConnectionString()
+	}
+
+	return ""
+}
+
+func (h *handleHolder) hasNewConnectionString() bool {
+	if h.helper != nil {
+		return h.ensembleProvider.ConnectionString() != h.helper.GetConnectionString()
+	}
+
+	return false
+}
+
+func (h *handleHolder) GetZookeeperConnection() (ZookeeperConnection, error) {
+	if h.helper != nil {
+		return h.helper.GetZookeeperConnection()
+	}
+
+	return nil, nil
+}
+
+func (h *handleHolder) closeAndClear() error {
+	err := h.internalClose()
+
+	h.helper = nil
+
+	return err
+}
+
+func (h *handleHolder) closeAndReset() error {
+	if err := h.internalClose(); err != nil {
+		return err
+	}
+
+	h.helper = &zookeeperFactory{holder: h}
+
+	return nil
+}
+
+func (h *handleHolder) internalClose() error {
+	if h.helper != nil {
+		if conn, err := h.GetZookeeperConnection(); err != nil {
+			return err
+		} else if conn != nil {
+			conn.Close()
+		}
+	}
+
+	return nil
+}
+
+type connectionState struct {
+	ensembleProvider  EnsembleProvider
+	sessionTimeout    time.Duration
+	connectionTimeout time.Duration
+	tracer            TracerDriver
+	parentWatchers    *Watchers
+	zooKeeper         *handleHolder
+	instanceIndex     int64
+	connectionStart   time.Time
+	isConnected       AtomicBool
+	backgroundErrors  chan error
+}
+
+func newConnectionState(zookeeperDialer ZookeeperDialer, ensembleProvider EnsembleProvider, sessionTimeout, connectionTimeout time.Duration,
+	parentWatcher Watcher, tracer TracerDriver, canBeReadOnly bool) *connectionState {
+
+	s := &connectionState{
+		ensembleProvider:  ensembleProvider,
+		sessionTimeout:    sessionTimeout,
+		connectionTimeout: connectionTimeout,
+		tracer:            tracer,
+		parentWatchers:    NewWatchers(),
+		connectionStart:   time.Now(),
+		backgroundErrors:  make(chan error, 64),
+	}
+
+	if zookeeperDialer == nil {
+		zookeeperDialer = &DefaultZookeeperDialer{}
+	}
+
+	s.zooKeeper = &handleHolder{
+		zookeeperDialer:  zookeeperDialer,
+		ensembleProvider: ensembleProvider,
+		watcher:          s,
+		sessionTimeout:   sessionTimeout,
+		canBeReadOnly:    canBeReadOnly,
+	}
+
+	if parentWatcher != nil {
+		s.parentWatchers.Add(parentWatcher)
+	}
+
+	return s
+}
+
+func (s *connectionState) Connected() bool {
+	return s.isConnected.Load()
+}
+
+func (s *connectionState) InstanceIndex() int64 {
+	return atomic.LoadInt64(&s.instanceIndex)
+}
+
+func (s *connectionState) Conn() (ZookeeperConnection, error) {
+	select {
+	case err := <-s.backgroundErrors:
+		if err != nil {
+			s.tracer.AddCount("background-exceptions", 1)
+
+			return nil, err
+		}
+	default:
+	}
+
+	if !s.isConnected.Load() {
+		s.checkTimeout()
+	}
+
+	return s.zooKeeper.GetZookeeperConnection()
+}
+
+func (s *connectionState) Start() error {
+	if err := s.ensembleProvider.Start(); err != nil {
+		return err
+	}
+
+	return s.reset()
+}
+
+func (s *connectionState) Close() error {
+	CloseQuietly(s.ensembleProvider)
+
+	err := s.zooKeeper.closeAndClear()
+
+	s.isConnected.Set(false)
+
+	return err
+}
+
+func (s *connectionState) reset() error {
+	atomic.AddInt64(&s.instanceIndex, 1)
+
+	s.isConnected.Set(false)
+
+	s.zooKeeper.closeAndReset()
+
+	_, err := s.zooKeeper.GetZookeeperConnection() // initiate connection
+
+	return err
+}
+
+func (s *connectionState) AddParentWatcher(watcher Watcher) Watcher {
+	return s.parentWatchers.Add(watcher)
+}
+
+func (s *connectionState) RemoveParentWatcher(watcher Watcher) Watcher {
+	return s.parentWatchers.Remove(watcher)
+}
+
+func (s *connectionState) checkTimeout() {
+	var minTimeout time.Duration
+
+	if s.sessionTimeout > s.connectionTimeout {
+		minTimeout = s.sessionTimeout - s.connectionTimeout
+	} else {
+		minTimeout = s.connectionTimeout - s.sessionTimeout
+	}
+
+	if time.Since(s.connectionStart) >= minTimeout {
+	}
+}
+
+func (s *connectionState) process(event *zk.Event) {
+
+}
 
 type ConnectionState int32
 
@@ -19,112 +246,6 @@ const (
 
 func (s ConnectionState) Connected() bool {
 	return s == CONNECTED || s == RECONNECTED || s == READ_ONLY
-}
-
-const (
-	MAX_BACKGROUND_EXCEPTIONS = 10
-)
-
-type ZookeeperConnectionState struct {
-	zookeeperDialer   ZookeeperDialer
-	ensembleProvider  EnsembleProvider
-	sessionTimeout    time.Duration
-	connectionTimeout time.Duration
-	tracer            TracerDriver
-	canReadOnly       bool
-	authInfos         []AuthInfo
-	parentWatchers    *Watchers
-	conn              ZookeeperConnection
-}
-
-func newZookeeperConnectionState(zookeeperDialer ZookeeperDialer, ensembleProvider EnsembleProvider, sessionTimeout, connectionTimeout time.Duration,
-	watcher Watcher, tracer TracerDriver, canReadOnly bool, authInfos []AuthInfo) *ZookeeperConnectionState {
-
-	s := &ZookeeperConnectionState{
-		zookeeperDialer:   zookeeperDialer,
-		ensembleProvider:  ensembleProvider,
-		sessionTimeout:    sessionTimeout,
-		connectionTimeout: connectionTimeout,
-		tracer:            tracer,
-		canReadOnly:       canReadOnly,
-		authInfos:         authInfos,
-		parentWatchers:    NewWatchers(),
-	}
-
-	if zookeeperDialer == nil {
-		s.zookeeperDialer = &DefaultZookeeperDialer{}
-	}
-
-	if watcher != nil {
-		s.parentWatchers.Add(watcher)
-	}
-
-	return s
-}
-
-func (s *ZookeeperConnectionState) isConnected() bool {
-	return s.conn != nil
-}
-
-func (s *ZookeeperConnectionState) Conn() (ZookeeperConnection, error) {
-	if s.conn != nil {
-		return s.conn, nil
-	}
-
-	if conn, events, err := s.zookeeperDialer.Dial(s.ensembleProvider.ConnectionString(), s.connectionTimeout, s.canReadOnly); err != nil {
-		return nil, err
-	} else {
-		for _, authInfo := range s.authInfos {
-			if err := conn.AddAuth(authInfo.Scheme, authInfo.Auth); err != nil {
-				conn.Close()
-
-				return nil, err
-			}
-		}
-
-		s.conn = conn
-
-		if events != nil {
-			go s.parentWatchers.Watch(events)
-		}
-
-		return conn, nil
-	}
-}
-
-func (s *ZookeeperConnectionState) Start() error {
-	if err := s.ensembleProvider.Start(); err != nil {
-		return err
-	}
-
-	return s.reset()
-}
-
-func (s *ZookeeperConnectionState) Close() error {
-	err := CloseQuietly(s.ensembleProvider)
-
-	s.conn.Close()
-	s.conn = nil
-
-	return err
-}
-
-func (s *ZookeeperConnectionState) reset() error {
-	if s.isConnected() {
-		CloseQuietly(s)
-	}
-
-	_, err := s.Conn()
-
-	return err
-}
-
-func (s *ZookeeperConnectionState) addParentWatcher(watcher Watcher) Watcher {
-	return s.parentWatchers.Add(watcher)
-}
-
-func (s *ZookeeperConnectionState) removeParentWatcher(watcher Watcher) Watcher {
-	return s.parentWatchers.Remove(watcher)
 }
 
 type connectionStateManager struct {
