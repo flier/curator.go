@@ -58,20 +58,20 @@ func (w *Watchers) Remove(watcher Watcher) Watcher {
 	return nil
 }
 
+func (w *Watchers) Fire(event *zk.Event) {
+	for _, watcher := range w.watchers {
+		if watcher != nil {
+			go watcher.process(event)
+		}
+	}
+}
+
 func (w *Watchers) Watch(events <-chan zk.Event) {
 	for {
 		if event, ok := <-events; !ok {
 			break
 		} else {
-			w.lock.Lock()
-			watchers := w.watchers
-			w.lock.Unlock()
-
-			for _, watcher := range watchers {
-				if watcher != nil {
-					go watcher.process(&event)
-				}
-			}
+			w.Fire(&event)
 		}
 	}
 }
