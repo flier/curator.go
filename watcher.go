@@ -68,7 +68,9 @@ func (w *Watchers) Watch(events <-chan zk.Event) {
 			w.lock.Unlock()
 
 			for _, watcher := range watchers {
-				go watcher.process(&event)
+				if watcher != nil {
+					go watcher.process(&event)
+				}
 			}
 		}
 	}
