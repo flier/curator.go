@@ -2,10 +2,10 @@ package curator
 
 import (
 	"errors"
+	"log"
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/samuel/go-zookeeper/zk"
 )
 
@@ -68,6 +68,20 @@ type ZookeeperDialer interface {
 	Dial(connString string, sessionTimeout time.Duration, canBeReadOnly bool) (ZookeeperConnection, <-chan zk.Event, error)
 }
 
+type ZookeeperDialFunc func(connString string, sessionTimeout time.Duration, canBeReadOnly bool) (ZookeeperConnection, <-chan zk.Event, error)
+
+type zookeeperDialer struct {
+	dial ZookeeperDialFunc
+}
+
+func (d *zookeeperDialer) Dial(connString string, sessionTimeout time.Duration, canBeReadOnly bool) (ZookeeperConnection, <-chan zk.Event, error) {
+	return d.dial(connString, sessionTimeout, canBeReadOnly)
+}
+
+func NewZookeeperDialer(dial ZookeeperDialFunc) ZookeeperDialer {
+	return &zookeeperDialer{dial}
+}
+
 type DefaultZookeeperDialer struct {
 	Dialer zk.Dialer
 }
@@ -77,7 +91,7 @@ func (d *DefaultZookeeperDialer) Dial(connString string, sessionTimeout time.Dur
 }
 
 type CuratorZookeeperClient struct {
-	state        *ZookeeperConnectionState
+	state        *connectionState
 	watcher      Watcher
 	started      AtomicBool
 	TracerDriver TracerDriver
@@ -88,13 +102,29 @@ func NewCuratorZookeeperClient(zookeeperDialer ZookeeperDialer, ensembleProvider
 	watcher Watcher, retryPolicy RetryPolicy, canReadOnly bool, authInfos []AuthInfo) *CuratorZookeeperClient {
 
 	if sessionTimeout < connectionTimeout {
-		glog.Warningf("session timeout [%d] is less than connection timeout [%d]", sessionTimeout, connectionTimeout)
+		log.Printf("session timeout [%d] is less than connection timeout [%d]", sessionTimeout, connectionTimeout)
 	}
+
+	dialer := NewZookeeperDialer(func(connString string, sessionTimeout time.Duration, canBeReadOnly bool) (conn ZookeeperConnection, events <-chan zk.Event, err error) {
+		conn, events, err = zookeeperDialer.Dial(connString, sessionTimeout, canBeReadOnly)
+
+		if err == nil && conn != nil {
+			for _, authInfo := range authInfos {
+				if err := conn.AddAuth(authInfo.Scheme, authInfo.Auth); err != nil {
+					conn.Close()
+
+					return nil, nil, err
+				}
+			}
+		}
+
+		return
+	})
 
 	tracer := newDefaultTracerDriver()
 
 	return &CuratorZookeeperClient{
-		state:        newZookeeperConnectionState(zookeeperDialer, ensembleProvider, sessionTimeout, connectionTimeout, watcher, tracer, canReadOnly, authInfos),
+		state:        newConnectionState(dialer, ensembleProvider, sessionTimeout, connectionTimeout, watcher, tracer, canReadOnly),
 		TracerDriver: tracer,
 		RetryPolicy:  retryPolicy,
 	}
@@ -116,7 +146,7 @@ func (c *CuratorZookeeperClient) Close() error {
 
 // Returns true if the client is current connected
 func (c *CuratorZookeeperClient) IsConnected() bool {
-	return c.state.isConnected()
+	return c.state.Connected()
 }
 
 func (c *CuratorZookeeperClient) CurrentConnectionString() string {
@@ -151,7 +181,7 @@ func (c *CuratorZookeeperClient) BlockUntilConnectedOrTimedOut() error {
 
 	c.internalBlockUntilConnectedOrTimedOut()
 
-	if c.state.isConnected() {
+	if c.state.Connected() {
 		return nil
 	}
 
@@ -162,13 +192,13 @@ func (c *CuratorZookeeperClient) internalBlockUntilConnectedOrTimedOut() error {
 	timer := time.NewTimer(c.state.connectionTimeout)
 	connected := make(chan error)
 
-	watcher := c.state.addParentWatcher(NewWatcher(func(*zk.Event) {
-		if c.state.isConnected() {
+	watcher := c.state.AddParentWatcher(NewWatcher(func(*zk.Event) {
+		if c.state.Connected() {
 			connected <- nil
 		}
 	}))
 
-	defer c.state.removeParentWatcher(watcher)
+	defer c.state.RemoveParentWatcher(watcher)
 
 	select {
 	case err := <-connected:
