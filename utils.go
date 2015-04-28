@@ -1,10 +1,9 @@
 package curator
 
 import (
+	"log"
 	"sync/atomic"
 	"unsafe"
-
-	"github.com/golang/glog"
 )
 
 // A Closeable is a source or destination of data that can be closed.
@@ -16,14 +15,14 @@ type Closeable interface {
 func CloseQuietly(closeable Closeable) (err error) {
 	defer func() {
 		if v := recover(); v != nil {
-			glog.Errorf("panic when closing %s, %v", closeable, v)
+			log.Printf("panic when closing %s, %v", closeable, v)
 
 			err, _ = v.(error)
 		}
 	}()
 
 	if err = closeable.Close(); err != nil {
-		glog.Errorf("fail to close %s, %s", closeable, err)
+		log.Printf("fail to close %s, %s", closeable, err)
 	}
 
 	return
@@ -57,3 +56,25 @@ func (b *AtomicBool) Swap(v bool) bool {
 }
 
 func (b *AtomicBool) Set(v bool) { b.Swap(v) }
+
+type State int32
+
+const (
+	LATENT  State = iota // Start() has not yet been called
+	STARTED              // Start() has been called
+	STOPPED              // Close() has been called
+)
+
+func (s *State) Change(oldState, newState State) bool {
+	return atomic.CompareAndSwapInt32((*int32)(s), int32(oldState), int32(newState))
+}
+
+func (s *State) Value() State {
+	return State(atomic.LoadInt32((*int32)(s)))
+}
+
+func (s State) Check(state State, msg string) {
+	if s != state {
+		panic(msg)
+	}
+}

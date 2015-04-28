@@ -2,34 +2,11 @@ package curator
 
 import (
 	"fmt"
-	"sync/atomic"
 	"time"
 
 	"github.com/golang/glog"
 	"github.com/samuel/go-zookeeper/zk"
 )
-
-type State int32
-
-const (
-	LATENT  State = iota // Start() has not yet been called
-	STARTED              // Start() has been called
-	STOPPED              // Close() has been called
-)
-
-func (s *State) Change(oldState, newState State) bool {
-	return atomic.CompareAndSwapInt32((*int32)(s), int32(oldState), int32(newState))
-}
-
-func (s *State) Value() State {
-	return State(atomic.LoadInt32((*int32)(s)))
-}
-
-func (s State) Check(state State, msg string) {
-	if s != state {
-		panic(msg)
-	}
-}
 
 const (
 	DEFAULT_SESSION_TIMEOUT    = 60 * time.Second
