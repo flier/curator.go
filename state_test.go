@@ -71,21 +71,27 @@ func TestZookeeperConnectionState(t *testing.T) {
 	canBeReadOnly := false
 	events := make(chan zk.Event)
 
-	watcher := NewWatcher(func(event *zk.Event) {
+	var sessionEvents []*zk.Event
 
+	watcher := NewWatcher(func(event *zk.Event) {
+		sessionEvents = append(sessionEvents, event)
 	})
 
+	// create connection
 	s := newConnectionState(zookeeperDialer, ensembleProvider, sessionTimeout, connectionTimeout, watcher, tracer, canBeReadOnly)
 
 	assert.NotNil(t, s)
 	assert.False(t, s.Connected())
 
+	// start connection
 	ensembleProvider.On("Start").Return(nil).Once()
 	ensembleProvider.On("ConnectionString").Return("connStr").Once()
 	zookeeperDialer.On("Dial", "connStr", sessionTimeout, canBeReadOnly).Return(conn, events, nil).Once()
 
 	assert.NoError(t, s.Start())
+	assert.False(t, s.Connected())
 
+	// close connection
 	ensembleProvider.On("Close").Return(nil).Once()
 	conn.On("Close").Return(nil).Once()
 

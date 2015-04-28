@@ -3,10 +3,19 @@ package curator
 import (
 	"errors"
 	"fmt"
+	"log"
 	"sync/atomic"
 	"time"
 
 	"github.com/samuel/go-zookeeper/zk"
+)
+
+const (
+	MAX_BACKGROUND_ERRORS = 10
+)
+
+var (
+	ErrConnectionLoss = errors.New("connection loss")
 )
 
 type zookeeperHelper interface {
@@ -130,7 +139,7 @@ func newConnectionState(zookeeperDialer ZookeeperDialer, ensembleProvider Ensemb
 		tracer:            tracer,
 		parentWatchers:    NewWatchers(),
 		connectionStart:   time.Now(),
-		backgroundErrors:  make(chan error, 64),
+		backgroundErrors:  make(chan error, MAX_BACKGROUND_ERRORS),
 	}
 
 	if zookeeperDialer == nil {
@@ -161,18 +170,14 @@ func (s *connectionState) InstanceIndex() int64 {
 }
 
 func (s *connectionState) Conn() (ZookeeperConnection, error) {
-	select {
-	case err := <-s.backgroundErrors:
-		if err != nil {
-			s.tracer.AddCount("background-exceptions", 1)
-
-			return nil, err
-		}
-	default:
+	if err := s.dequeBackgroundException(); err != nil {
+		return nil, err
 	}
 
 	if !s.isConnected.Load() {
-		s.checkTimeout()
+		if err := s.checkTimeout(); err != nil {
+			return nil, err
+		}
 	}
 
 	return s.zooKeeper.getZookeeperConnection()
@@ -216,21 +221,138 @@ func (s *connectionState) RemoveParentWatcher(watcher Watcher) Watcher {
 	return s.parentWatchers.Remove(watcher)
 }
 
-func (s *connectionState) checkTimeout() {
-	var minTimeout time.Duration
+func (s *connectionState) checkTimeout() error {
+	var minTimeout, maxTimeout time.Duration
 
 	if s.sessionTimeout > s.connectionTimeout {
-		minTimeout = s.sessionTimeout - s.connectionTimeout
+		minTimeout = s.connectionTimeout
+		maxTimeout = s.sessionTimeout
 	} else {
-		minTimeout = s.connectionTimeout - s.sessionTimeout
+		minTimeout = s.sessionTimeout
+		maxTimeout = s.connectionTimeout
 	}
 
-	if time.Since(s.connectionStart) >= minTimeout {
+	elapsed := time.Since(s.connectionStart)
+
+	if elapsed >= minTimeout {
+		if s.zooKeeper.hasNewConnectionString() {
+			s.handleNewConnectionString()
+		} else if elapsed > maxTimeout {
+			log.Printf("Connection attempt unsuccessful after %d (greater than max timeout of %v). Resetting connection and trying again with a new connection.", elapsed, maxTimeout)
+
+			return s.reset()
+		} else {
+			log.Printf("Connection timed out for connection string (%s) and timeout (%v) / elapsed (%v)", s.zooKeeper.getConnectionString(), s.connectionTimeout, elapsed)
+
+			s.tracer.AddCount("connections-timed-out", 1)
+
+			return ErrConnectionLoss
+		}
 	}
+
+	return nil
 }
 
 func (s *connectionState) process(event *zk.Event) {
+	log.Printf("connectionState watcher: %v", event)
 
+	for _, watcher := range s.parentWatchers.watchers {
+		go func() {
+			tracer := newTimeTracer("connection-state-parent-process", s.tracer)
+
+			defer tracer.Commit()
+
+			watcher.process(event)
+		}()
+	}
+
+	wasConnected := s.isConnected.Load()
+	newIsConnected := wasConnected
+
+	if event.Type == zk.EventSession {
+		newIsConnected = s.checkState(event.State, event.Err, wasConnected)
+	}
+
+	if wasConnected != newIsConnected {
+		s.isConnected.Set(newIsConnected)
+		s.connectionStart = time.Now()
+	}
+}
+
+func (s *connectionState) checkState(state zk.State, err error, wasConnected bool) bool {
+	isConnected := wasConnected
+	checkNewConnectionString := true
+
+	switch state {
+	case zk.StateHasSession:
+		isConnected = true
+
+	case zk.StateExpired:
+		isConnected = false
+		checkNewConnectionString = false
+
+		s.handleExpiredSession()
+
+	case zk.StateConnecting, zk.StateConnected, zk.StateDisconnected:
+	default:
+		isConnected = false
+	}
+
+	if checkNewConnectionString && s.zooKeeper.hasNewConnectionString() {
+		s.handleNewConnectionString()
+	}
+
+	return isConnected
+}
+
+func (s *connectionState) handleNewConnectionString() {
+	log.Print("Connection string changed")
+
+	s.tracer.AddCount("connection-string-changed", 1)
+
+	if err := s.reset(); err != nil {
+		s.queueBackgroundException(err)
+	}
+}
+
+func (s *connectionState) handleExpiredSession() {
+	log.Print("Session expired event received")
+
+	s.tracer.AddCount("session-expired", 1)
+
+	if err := s.reset(); err != nil {
+		s.queueBackgroundException(err)
+	}
+}
+
+func (s *connectionState) queueBackgroundException(err error) {
+	for {
+		select {
+		case s.backgroundErrors <- err:
+			return
+		default:
+		}
+
+		if _, ok := <-s.backgroundErrors; !ok {
+			return
+		} else {
+			s.tracer.AddCount("connection-drop-background-error", 1)
+		}
+	}
+}
+
+func (s *connectionState) dequeBackgroundException() error {
+	select {
+	case err := <-s.backgroundErrors:
+		if err != nil {
+			s.tracer.AddCount("background-exceptions", 1)
+
+			return err
+		}
+	default:
+	}
+
+	return nil
 }
 
 type ConnectionState int32
