@@ -8,6 +8,58 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestHandleHolder(t *testing.T) {
+	ensembleProvider := &mockEnsembleProvider{log: t.Logf}
+	zookeeperDialer := &mockZookeeperDialer{log: t.Logf}
+	zookeeperConnection := &mockConn{log: t.Logf}
+	events := make(chan zk.Event)
+	watcher := NewWatcher(func(event *zk.Event) {})
+
+	// create new connection holder
+	h := &handleHolder{
+		zookeeperDialer:  zookeeperDialer,
+		ensembleProvider: ensembleProvider,
+		watcher:          watcher,
+		sessionTimeout:   15 * time.Second,
+	}
+
+	assert.Equal(t, "", h.getConnectionString())
+	assert.False(t, h.hasNewConnectionString())
+	conn, err := h.getZookeeperConnection()
+	assert.Nil(t, conn)
+	assert.NoError(t, err)
+
+	// close and reset helper
+	assert.NoError(t, h.closeAndReset())
+
+	assert.NotNil(t, h.helper)
+	assert.Equal(t, "", h.getConnectionString())
+	assert.IsType(t, (*zookeeperFactory)(nil), h.helper)
+
+	// get and create connection
+	ensembleProvider.On("ConnectionString").Return("connStr").Once()
+	zookeeperDialer.On("Dial", "connStr", h.sessionTimeout, h.canBeReadOnly).Return(zookeeperConnection, events, nil).Once()
+
+	conn, err = h.getZookeeperConnection()
+
+	assert.NotNil(t, conn)
+	assert.NoError(t, err)
+	assert.Equal(t, "connStr", h.getConnectionString())
+	assert.NotNil(t, h.helper)
+	assert.IsType(t, (*zookeeperCache)(nil), h.helper)
+
+	// close connection
+	zookeeperConnection.On("Close").Return(nil).Once()
+
+	assert.NoError(t, h.closeAndClear())
+
+	close(events)
+
+	ensembleProvider.AssertExpectations(t)
+	zookeeperDialer.AssertExpectations(t)
+	zookeeperConnection.AssertExpectations(t)
+}
+
 func TestZookeeperConnectionState(t *testing.T) {
 	ensembleProvider := &mockEnsembleProvider{log: t.Logf}
 	zookeeperDialer := &mockZookeeperDialer{log: t.Logf}

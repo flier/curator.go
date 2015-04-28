@@ -69,7 +69,7 @@ func (h *handleHolder) hasNewConnectionString() bool {
 	return false
 }
 
-func (h *handleHolder) GetZookeeperConnection() (ZookeeperConnection, error) {
+func (h *handleHolder) getZookeeperConnection() (ZookeeperConnection, error) {
 	if h.helper != nil {
 		return h.helper.GetZookeeperConnection()
 	}
@@ -97,7 +97,7 @@ func (h *handleHolder) closeAndReset() error {
 
 func (h *handleHolder) internalClose() error {
 	if h.helper != nil {
-		if conn, err := h.GetZookeeperConnection(); err != nil {
+		if conn, err := h.getZookeeperConnection(); err != nil {
 			return err
 		} else if conn != nil {
 			conn.Close()
@@ -175,7 +175,7 @@ func (s *connectionState) Conn() (ZookeeperConnection, error) {
 		s.checkTimeout()
 	}
 
-	return s.zooKeeper.GetZookeeperConnection()
+	return s.zooKeeper.getZookeeperConnection()
 }
 
 func (s *connectionState) Start() error {
@@ -203,7 +203,7 @@ func (s *connectionState) reset() error {
 
 	s.zooKeeper.closeAndReset()
 
-	_, err := s.zooKeeper.GetZookeeperConnection() // initiate connection
+	_, err := s.zooKeeper.getZookeeperConnection() // initiate connection
 
 	return err
 }
