@@ -38,7 +38,7 @@ type mockTracerDriver struct {
 
 func (t *mockTracerDriver) AddTime(name string, d time.Duration) {
 	if t.log != nil {
-		t.log("AddTime(name=\"%s\", d=%v)", name, d)
+		t.log("TracerDriver.AddTime(name=\"%s\", d=%v)", name, d)
 	}
 
 	t.Called(name, d)
@@ -46,7 +46,7 @@ func (t *mockTracerDriver) AddTime(name string, d time.Duration) {
 
 func (t *mockTracerDriver) AddCount(name string, increment int) {
 	if t.log != nil {
-		t.log("AddCount(name=\"%s\", increment=%d)", name, increment)
+		t.log("TracerDriver.AddCount(name=\"%s\", increment=%d)", name, increment)
 	}
 
 	t.Called(name, increment)
@@ -74,7 +74,7 @@ func (r *mockRetryPolicy) AllowRetry(retryCount int, elapsedTime time.Duration, 
 	allow := args.Bool(0)
 
 	if r.log != nil {
-		r.log("AllowRetry(retryCount=%d, elapsedTime=%v, sleeper=%p) allow=%v", retryCount, elapsedTime, sleeper, allow)
+		r.log("RetryPolicy.AllowRetry(retryCount=%d, elapsedTime=%v, sleeper=%p) allow=%v", retryCount, elapsedTime, sleeper, allow)
 	}
 
 	return allow
@@ -125,8 +125,13 @@ type mockConn struct {
 
 func (c *mockConn) AddAuth(scheme string, auth []byte) error {
 	args := c.Called(scheme, auth)
+	err := args.Error(0)
 
-	return args.Error(0)
+	if c.log != nil {
+		c.log("ZookeeperConnection.AddAuth(scheme=\"%s\", auth=[]byte(\"%s\")) error=%v", scheme, auth, err)
+	}
+
+	return err
 }
 
 func (c *mockConn) Close() {
@@ -138,22 +143,13 @@ func (c *mockConn) Close() {
 }
 
 func (c *mockConn) Create(path string, data []byte, flags int32, acls []zk.ACL) (string, error) {
-	/*
-		if c.log != nil {
-			c.log("Before Create(\"%s\", []byte(\"%s\"), %d, %v)", path, data, flags, acls)
-
-			if len(path) == 0 {
-				panic(path)
-			}
-		}
-	*/
 	args := c.Called(path, data, flags, acls)
 
 	createPath := args.String(0)
 	err := args.Error(1)
 
 	if c.log != nil {
-		c.log("Create(path=\"%s\", data=[]byte(\"%s\"), flags=%d, alcs=%v) (createdPath=\"%s\", error=%v)", path, data, flags, acls, createPath, err)
+		c.log("ZookeeperConnection.Create(path=\"%s\", data=[]byte(\"%s\"), flags=%d, alcs=%v) (createdPath=\"%s\", error=%v)", path, data, flags, acls, createPath, err)
 	}
 
 	return createPath, err
@@ -167,7 +163,7 @@ func (c *mockConn) Exists(path string) (bool, *zk.Stat, error) {
 	err := args.Error(2)
 
 	if c.log != nil {
-		c.log("Exists(path=\"%s\")(exists=%v, stat=%v, error=%v)", path, exists, stat, err)
+		c.log("ZookeeperConnection.Exists(path=\"%s\")(exists=%v, stat=%v, error=%v)", path, exists, stat, err)
 	}
 
 	return exists, stat, err
@@ -182,7 +178,7 @@ func (c *mockConn) ExistsW(path string) (bool, *zk.Stat, <-chan zk.Event, error)
 	err := args.Error(3)
 
 	if c.log != nil {
-		c.log("ExistsW(path=\"%s\")(exists=%v, stat=%v, events=%v, error=%v)", path, exists, stat, events, err)
+		c.log("ZookeeperConnection.ExistsW(path=\"%s\")(exists=%v, stat=%v, events=%v, error=%v)", path, exists, stat, events, err)
 	}
 
 	return exists, stat, events, err
@@ -194,7 +190,7 @@ func (c *mockConn) Delete(path string, version int32) error {
 	err := args.Error(0)
 
 	if c.log != nil {
-		c.log("Delete(path=\"%s\", version=%d) error=%v", path, version, err)
+		c.log("ZookeeperConnection.Delete(path=\"%s\", version=%d) error=%v", path, version, err)
 	}
 
 	return err
@@ -208,7 +204,7 @@ func (c *mockConn) Get(path string) ([]byte, *zk.Stat, error) {
 	err := args.Error(2)
 
 	if c.log != nil {
-		c.log("Get(path=\"%s\")(data=%v, stat=%v, error=%v)", path, data, stat, err)
+		c.log("ZookeeperConnection.Get(path=\"%s\")(data=%v, stat=%v, error=%v)", path, data, stat, err)
 	}
 
 	return data, stat, err
@@ -223,7 +219,7 @@ func (c *mockConn) GetW(path string) ([]byte, *zk.Stat, <-chan zk.Event, error) 
 	err := args.Error(3)
 
 	if c.log != nil {
-		c.log("GetW(path=\"%s\")(data=%v, stat=%v, events=%p, error=%v)", path, data, stat, err)
+		c.log("ZookeeperConnection.GetW(path=\"%s\")(data=%v, stat=%v, events=%p, error=%v)", path, data, stat, err)
 	}
 
 	return data, stat, events, err
@@ -236,7 +232,7 @@ func (c *mockConn) Set(path string, data []byte, version int32) (*zk.Stat, error
 	err := args.Error(1)
 
 	if c.log != nil {
-		c.log("Set(path=\"%s\", data=%v, version=%d) (stat=%v, error=%v)", path, data, version, stat, err)
+		c.log("ZookeeperConnection.Set(path=\"%s\", data=%v, version=%d) (stat=%v, error=%v)", path, data, version, stat, err)
 	}
 
 	return stat, err
@@ -250,7 +246,7 @@ func (c *mockConn) Children(path string) ([]string, *zk.Stat, error) {
 	err := args.Error(2)
 
 	if c.log != nil {
-		c.log("Children(path=\"%s\")(children=%v, stat=%v, error=%v)", path, children, stat, err)
+		c.log("ZookeeperConnection.Children(path=\"%s\")(children=%v, stat=%v, error=%v)", path, children, stat, err)
 	}
 
 	return children, stat, err
@@ -265,7 +261,7 @@ func (c *mockConn) ChildrenW(path string) ([]string, *zk.Stat, <-chan zk.Event, 
 	err := args.Error(3)
 
 	if c.log != nil {
-		c.log("ChildrenW(path=\"%s\")(children=%v, stat=%v, events=%v, error=%v)", path, children, stat, events, err)
+		c.log("ZookeeperConnection.ChildrenW(path=\"%s\")(children=%v, stat=%v, events=%v, error=%v)", path, children, stat, events, err)
 	}
 
 	return children, stat, events, err
@@ -276,16 +272,26 @@ func (c *mockConn) GetACL(path string) ([]zk.ACL, *zk.Stat, error) {
 
 	acls, _ := args.Get(0).([]zk.ACL)
 	stat, _ := args.Get(1).(*zk.Stat)
+	err := args.Error(2)
 
-	return acls, stat, args.Error(2)
+	if c.log != nil {
+		c.log("ZookeeperConnection.GetACL(path=\"%s\")(acls=%v, stat=%v, error=%v)", path, acls, stat, err)
+	}
+
+	return acls, stat, err
 }
 
 func (c *mockConn) SetACL(path string, acls []zk.ACL, version int32) (*zk.Stat, error) {
 	args := c.Called(path, acls, version)
 
 	stat, _ := args.Get(0).(*zk.Stat)
+	err := args.Error(1)
 
-	return stat, args.Error(1)
+	if c.log != nil {
+		c.log("ZookeeperConnection.SetACL(path=\"%s\", acls=%v, version=%d) (stat=%v, error=%v)", path, acls, version, stat, err)
+	}
+
+	return stat, err
 }
 
 func (c *mockConn) Multi(ops ...interface{}) ([]zk.MultiResponse, error) {
@@ -297,7 +303,7 @@ func (c *mockConn) Multi(ops ...interface{}) ([]zk.MultiResponse, error) {
 	err := args.Error(1)
 
 	if c.log != nil {
-		c.log("Multi(ops=%v)(responses=%v, error=%v)", ops, res, err)
+		c.log("ZookeeperConnection.Multi(ops=%v)(responses=%v, error=%v)", ops, res, err)
 	}
 
 	return res, err
@@ -305,8 +311,14 @@ func (c *mockConn) Multi(ops ...interface{}) ([]zk.MultiResponse, error) {
 
 func (c *mockConn) Sync(path string) (string, error) {
 	args := c.Called(path)
+	p := args.String(0)
+	err := args.Error(1)
 
-	return args.String(0), args.Error(1)
+	if c.log != nil {
+		c.log("ZookeeperConnection.Sync(path=\"%s\")(path=\"%s\", error=%v)", path, p, err)
+	}
+
+	return path, err
 }
 
 type mockZookeeperDialer struct {
@@ -323,7 +335,7 @@ func (d *mockZookeeperDialer) Dial(connString string, sessionTimeout time.Durati
 	err := args.Error(2)
 
 	if d.log != nil {
-		d.log("Dial(connectString=\"%s\", sessionTimeout=%v, canBeReadOnly=%v)(conn=%p, events=%v, error=%v)", connString, sessionTimeout, canBeReadOnly, conn, events, err)
+		d.log("ZookeeperDialer.Dial(connectString=\"%s\", sessionTimeout=%v, canBeReadOnly=%v)(conn=%p, events=%v, error=%v)", connString, sessionTimeout, canBeReadOnly, conn, events, err)
 	}
 
 	return conn, events, err
@@ -342,7 +354,7 @@ func (p *mockCompressionProvider) Compress(path string, data []byte) ([]byte, er
 	err := args.Error(1)
 
 	if p.log != nil {
-		p.log("Compress(path=\"%s\", data=[]byte(\"%s\"))(compressedData=[]byte(\"%s\"), error=%v)", path, data, compressedData, err)
+		p.log("CompressionProvider.Compress(path=\"%s\", data=[]byte(\"%s\"))(compressedData=[]byte(\"%s\"), error=%v)", path, data, compressedData, err)
 	}
 
 	return compressedData, err
@@ -355,7 +367,7 @@ func (p *mockCompressionProvider) Decompress(path string, compressedData []byte)
 	err := args.Error(1)
 
 	if p.log != nil {
-		p.log("Decompress(path=\"%s\", compressedData=[]byte(\"%s\"))(data=[]byte(\"%s\"), error=%v)", path, compressedData, data, err)
+		p.log("CompressionProvider.Decompress(path=\"%s\", compressedData=[]byte(\"%s\"))(data=[]byte(\"%s\"), error=%v)", path, compressedData, data, err)
 	}
 
 	return data, err
@@ -373,7 +385,7 @@ func (p *mockACLProvider) GetDefaultAcl() []zk.ACL {
 	acls, _ := args.Get(0).([]zk.ACL)
 
 	if p.log != nil {
-		p.log("GetDefaultAcl()(acls=%v)", acls)
+		p.log("ACLProvider.GetDefaultAcl()(acls=%v)", acls)
 	}
 
 	return acls
@@ -385,7 +397,7 @@ func (p *mockACLProvider) GetAclForPath(path string) []zk.ACL {
 	acls, _ := args.Get(0).([]zk.ACL)
 
 	if p.log != nil {
-		p.log("GetAclForPath(path=\"%s\")(acls=%v)", path, acls)
+		p.log("ACLProvider.GetAclForPath(path=\"%s\")(acls=%v)", path, acls)
 	}
 
 	return acls
@@ -403,7 +415,7 @@ func (e *mockEnsurePath) Ensure(client *CuratorZookeeperClient) error {
 	err := args.Error(0)
 
 	if e.log != nil {
-		e.log("Ensure(client=%p) error=%v", client, err)
+		e.log("EnsurePath.Ensure(client=%p) error=%v", client, err)
 	}
 
 	return err
@@ -415,7 +427,7 @@ func (e *mockEnsurePath) ExcludingLast() EnsurePath {
 	ret, _ := args.Get(0).(EnsurePath)
 
 	if e.log != nil {
-		e.log("ExcludingLast() EnsurePath=%p", ret)
+		e.log("EnsurePath.ExcludingLast() EnsurePath=%p", ret)
 	}
 
 	return ret
@@ -433,7 +445,7 @@ func (h *mockEnsurePathHelper) Ensure(client *CuratorZookeeperClient, path strin
 	err := args.Error(0)
 
 	if h.log != nil {
-		h.log("Ensure(client=%p, path=\"%s\", makeLastNode=%v) error=%v", client, path, makeLastNode, err)
+		h.log("EnsurePathHelper.Ensure(client=%p, path=\"%s\", makeLastNode=%v) error=%v", client, path, makeLastNode, err)
 	}
 
 	return err
