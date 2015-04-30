@@ -259,7 +259,30 @@ func (s *ConnectionStateTestSuite) TestConnected() {
 }
 
 func (s *ConnectionStateTestSuite) TestNewConnectionString() {
+	s.connStrTimes = 3
+	s.dialTimes = 2
+	s.connCloseTimes = 2
 
+	s.Start()
+	defer s.Close()
+
+	instanceIndex := s.state.InstanceIndex()
+
+	// receive StateHasSession event
+	s.tracer.On("AddTime", "connection-state-parent-process", mock.AnythingOfType("Duration")).Return().Once()
+	s.tracer.On("AddCount", "connection-string-changed", 1).Return().Once()
+
+	s.state.zooKeeper.helper.(*zookeeperCache).connnectString = "anotherStr"
+
+	s.events <- zk.Event{
+		Type:  zk.EventSession,
+		State: zk.StateHasSession,
+	}
+
+	time.Sleep(100 * time.Microsecond)
+
+	assert.Equal(s.T(), instanceIndex+1, s.state.InstanceIndex())
+	assert.False(s.T(), s.state.Connected())
 }
 
 func (s *ConnectionStateTestSuite) TestExpiredSession() {
@@ -351,4 +374,77 @@ func (s *ConnectionStateTestSuite) TestParentWatcher() {
 	assert.Equal(s.T(), 2, len(s.sessionEvents))
 	assert.Equal(s.T(), zk.StateConnecting, s.sessionEvents[0].State)
 	assert.Equal(s.T(), zk.StateDisconnected, s.sessionEvents[1].State)
+}
+
+type ConnectionStateManagerTestSuite struct {
+	suite.Suite
+
+	client         *mockCuratorFramework
+	state          *connectionStateManager
+	receivedStates []ConnectionState
+}
+
+func TestConnectionStateManagerTestSuite(t *testing.T) {
+	suite.Run(t, new(ConnectionStateManagerTestSuite))
+}
+
+func (s *ConnectionStateManagerTestSuite) SetupTest() {
+	s.client = &mockCuratorFramework{}
+	s.state = newConnectionStateManager(s.client)
+	s.state.Listenable().AddListener(NewConnectionStateListener(func(client CuratorFramework, newState ConnectionState) {
+		s.receivedStates = append(s.receivedStates, newState)
+	}))
+}
+
+func (s *ConnectionStateManagerTestSuite) TearDownTest() {
+	s.client.AssertExpectations(s.T())
+
+	s.receivedStates = nil
+}
+
+func (s *ConnectionStateManagerTestSuite) TestStateChange() {
+	// return false before StateManager.Start
+	assert.False(s.T(), s.state.AddStateChange(CONNECTED))
+	assert.False(s.T(), s.state.SetToSuspended())
+
+	assert.NoError(s.T(), s.state.Start())
+
+	defer s.state.Close()
+
+	assert.NotNil(s.T(), s.state.Listenable())
+	assert.False(s.T(), s.state.Connected())
+
+	// return false when newState same to current
+	assert.False(s.T(), s.state.AddStateChange(s.state.currentConnectionState))
+
+	// automatic broadcast CONNECTED on the first time
+	assert.True(s.T(), s.state.AddStateChange(RECONNECTED))
+
+	time.Sleep(100 * time.Microsecond)
+
+	assert.Equal(s.T(), RECONNECTED, s.state.currentConnectionState)
+	assert.Equal(s.T(), []ConnectionState{CONNECTED}, s.receivedStates)
+	assert.True(s.T(), s.state.Connected())
+
+	// broadcast RECONNECTED on the second time
+	assert.True(s.T(), s.state.AddStateChange(CONNECTED))
+
+	time.Sleep(100 * time.Microsecond)
+
+	assert.Equal(s.T(), CONNECTED, s.state.currentConnectionState)
+	assert.Equal(s.T(), []ConnectionState{CONNECTED, CONNECTED}, s.receivedStates)
+	assert.True(s.T(), s.state.Connected())
+
+	// set to suspend
+	assert.True(s.T(), s.state.SetToSuspended())
+	assert.Equal(s.T(), SUSPENDED, s.state.currentConnectionState)
+
+	time.Sleep(100 * time.Microsecond)
+
+	assert.False(s.T(), s.state.SetToSuspended())
+	assert.Equal(s.T(), []ConnectionState{CONNECTED, CONNECTED, SUSPENDED}, s.receivedStates)
+}
+
+func (s *ConnectionStateManagerTestSuite) TestBlockUntilConnected() {
+
 }

@@ -4,15 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/samuel/go-zookeeper/zk"
 )
 
-const (
-	MAX_BACKGROUND_ERRORS = 10
-)
+const MAX_BACKGROUND_ERRORS = 10
 
 var (
 	ErrConnectionLoss = errors.New("connection loss")
@@ -297,11 +296,15 @@ func (s *connectionState) checkState(state zk.State, err error, wasConnected boo
 		s.handleExpiredSession()
 
 	case zk.StateConnecting, zk.StateConnected, zk.StateDisconnected:
+		isConnected = false
+
 	default:
 		isConnected = false
 	}
 
 	if checkNewConnectionString && s.zooKeeper.hasNewConnectionString() {
+		isConnected = false
+
 		s.handleNewConnectionString()
 	}
 
@@ -373,20 +376,24 @@ func (s ConnectionState) Connected() bool {
 	return s == CONNECTED || s == RECONNECTED || s == READ_ONLY
 }
 
+const STATE_QUEUE_SIZE = 25
+
 type connectionStateManager struct {
-	client                 CuratorFramework
-	listeners              ConnectionStateListenable
-	state                  State
-	currentConnectionState ConnectionState
-	events                 chan ConnectionState
-	QueueSize              int
+	client                    CuratorFramework
+	listeners                 ConnectionStateListenable
+	state                     State
+	currentConnectionState    ConnectionState
+	lock                      sync.Mutex
+	initialConnectMessageSent AtomicBool
+	events                    chan ConnectionState
+	QueueSize                 int
 }
 
 func newConnectionStateManager(client CuratorFramework) *connectionStateManager {
 	return &connectionStateManager{
 		client:    client,
 		listeners: new(connectionStateListenerContainer),
-		QueueSize: 25,
+		QueueSize: STATE_QUEUE_SIZE,
 	}
 }
 
@@ -402,44 +409,76 @@ func (m *connectionStateManager) Start() error {
 	return nil
 }
 
-func (m *connectionStateManager) Close() error {
+func (m *connectionStateManager) Close() {
 	if !m.state.Change(STARTED, STOPPED) {
-		return nil
+		return
 	}
 
 	close(m.events)
 
-	return nil
+	m.listeners.Clear()
 }
 
-func (m *connectionStateManager) processEvents() {
-	for {
-		if newState, ok := <-m.events; !ok {
-			return // queue closed
-		} else {
-			m.listeners.ForEach(func(listener interface{}) {
-				listener.(ConnectionStateListener).StateChanged(m.client, newState)
-			})
-		}
-	}
+func (m *connectionStateManager) Listenable() ConnectionStateListenable {
+	return m.listeners
 }
 
-func (m *connectionStateManager) postState(state ConnectionState) {
-	for {
-		select {
-		case m.events <- state:
-			return
-		default:
-		}
+// Change to ConnectionState.SUSPENDED only if not already suspended and not lost
+func (m *connectionStateManager) SetToSuspended() bool {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 
-		select {
-		case <-m.events: // "ConnectionStateManager queue full - dropping events to make room"
-		default:
+	if m.state.Value() != STARTED {
+		return false
+	}
+
+	if m.currentConnectionState == LOST || m.currentConnectionState == SUSPENDED {
+		return false
+	}
+
+	m.currentConnectionState = SUSPENDED
+
+	m.postState(SUSPENDED)
+
+	return true
+}
+
+// Post a state change. If the manager is already in that state the change is ignored.
+// Otherwise the change is queued for listeners.
+func (m *connectionStateManager) AddStateChange(newConnectionState ConnectionState) bool {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	if m.state.Value() != STARTED {
+		return false
+	}
+
+	if m.currentConnectionState == newConnectionState {
+		return false
+	}
+
+	m.currentConnectionState = newConnectionState
+
+	localState := newConnectionState
+
+	switch newConnectionState {
+	case LOST, SUSPENDED, READ_ONLY:
+		break
+	default:
+		if m.initialConnectMessageSent.CompareAndSwap(false, true) {
+			localState = CONNECTED
 		}
 	}
+
+	m.postState(localState)
+
+	return true
 }
 
 func (m *connectionStateManager) BlockUntilConnected(maxWaitTime time.Duration) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	c := make(chan ConnectionState)
 
 	listener := NewConnectionStateListener(func(client CuratorFramework, newState ConnectionState) {
@@ -465,5 +504,41 @@ func (m *connectionStateManager) BlockUntilConnected(maxWaitTime time.Duration) 
 		<-c
 
 		return nil
+	}
+}
+
+func (m *connectionStateManager) Connected() bool {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	return m.currentConnectionState.Connected()
+}
+
+func (m *connectionStateManager) postState(state ConnectionState) {
+	for {
+		select {
+		case m.events <- state:
+			return
+		default:
+		}
+
+		select {
+		case <-m.events:
+			log.Printf("ConnectionStateManager queue full - dropping events to make room")
+
+		default:
+		}
+	}
+}
+
+func (m *connectionStateManager) processEvents() {
+	for {
+		if newState, ok := <-m.events; !ok {
+			return // queue closed
+		} else {
+			m.listeners.ForEach(func(listener interface{}) {
+				listener.(ConnectionStateListener).StateChanged(m.client, newState)
+			})
+		}
 	}
 }
