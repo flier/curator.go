@@ -80,7 +80,7 @@ func (c *NodeCacheListenerContainer) RemoveListener(listener NodeCacheListener) 
 type NodeCache struct {
 	client                  curator.CuratorFramework
 	path                    string
-	compressed              bool
+	dataIsCompressed        bool
 	ensurePath              curator.EnsurePath
 	state                   curator.State
 	isConnected             curator.AtomicBool
@@ -91,13 +91,13 @@ type NodeCache struct {
 	listeners               *NodeCacheListenerContainer
 }
 
-func NewNodeCache(client curator.CuratorFramework, path string, compressed bool) *NodeCache {
+func NewNodeCache(client curator.CuratorFramework, path string, dataIsCompressed bool) *NodeCache {
 	c := &NodeCache{
-		client:     client,
-		path:       path,
-		compressed: compressed,
-		ensurePath: client.NewNamespaceAwareEnsurePath(path).ExcludingLast(),
-		listeners:  &NodeCacheListenerContainer{},
+		client:           client,
+		path:             path,
+		dataIsCompressed: dataIsCompressed,
+		ensurePath:       client.NewNamespaceAwareEnsurePath(path).ExcludingLast(),
+		listeners:        &NodeCacheListenerContainer{},
 	}
 
 	c.connectionStateListener = curator.NewConnectionStateListener(func(client curator.CuratorFramework, newState curator.ConnectionState) {
@@ -149,7 +149,7 @@ func (c *NodeCache) StartAndInitalize(buildInitial bool) error {
 
 func (c *NodeCache) Close() error {
 	if c.state.Change(curator.STARTED, curator.STOPPED) {
-
+		c.listeners.Clear()
 	}
 
 	c.client.ConnectionStateListenable().RemoveListener(c.connectionStateListener)
@@ -166,7 +166,7 @@ func (c *NodeCache) internalRebuild() error {
 
 	builder := c.client.GetData()
 
-	if c.compressed {
+	if c.dataIsCompressed {
 		builder.Decompressed()
 	}
 
@@ -203,7 +203,7 @@ func (c *NodeCache) processBackgroundResult(event curator.CuratorEvent) error {
 		} else if event.Err() == nil {
 			builder := c.client.GetData()
 
-			if c.compressed {
+			if c.dataIsCompressed {
 				builder.Decompressed()
 			}
 
@@ -222,4 +222,60 @@ func (c *NodeCache) setNewData(newData *ChildData) {
 			listener.(NodeCacheListener).NodeChanged()
 		})
 	}
+}
+
+type RefreshMode int
+
+const (
+	STANDARD RefreshMode = iota
+	FORCE_GET_DATA_AND_STAT
+	POST_INITIALIZED
+)
+
+// A utility that attempts to keep all data from all children of a ZK path locally cached.
+// This class will watch the ZK path, respond to update/create/delete events, pull down the data, etc.
+// You can register a listener that will get notified when changes occur.
+type PathChildrenCache struct {
+	client                  curator.CuratorFramework
+	path                    string
+	cacheData               bool
+	dataIsCompressed        bool
+	ensurePath              curator.EnsurePath
+	state                   curator.State
+	connectionStateListener curator.ConnectionStateListener
+	isConnected             curator.AtomicBool
+}
+
+func NewPathChildrenCache(client curator.CuratorFramework, path string, cacheData, dataIsCompressed bool) *PathChildrenCache {
+	c := &PathChildrenCache{
+		client:           client,
+		path:             path,
+		cacheData:        cacheData,
+		dataIsCompressed: dataIsCompressed,
+		ensurePath:       client.NewNamespaceAwareEnsurePath(path),
+	}
+
+	c.connectionStateListener = curator.NewConnectionStateListener(func(client curator.CuratorFramework, newState curator.ConnectionState) {
+		if newState.Connected() {
+			if c.isConnected.CompareAndSwap(false, true) {
+				if err := c.reset(); err != nil {
+					panic(fmt.Errorf("Trying to reset after reconnection, %s", err))
+				}
+			}
+		} else {
+			c.isConnected.Set(false)
+		}
+	})
+
+	return c
+}
+
+func (c *PathChildrenCache) RefreshMode(mode RefreshMode) {
+	c.ensurePath.Ensure(c.client.ZookeeperClient())
+
+	c.client.GetChildren().UsingWatcher(c.childrenWatcher).InBackground(func(client CuratorFramework, event CuratorEvent) error {
+		if c.state.Value() == STOPPED {
+
+		}
+	}).ForPath(c.path)
 }
