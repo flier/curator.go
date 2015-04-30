@@ -227,9 +227,7 @@ func (s *ConnectionStateTestSuite) TestConnected() {
 		State: zk.StateHasSession,
 	}
 
-	for i := 0; i < 10 && !s.state.Connected(); i++ {
-		time.Sleep(100 * time.Microsecond)
-	}
+	time.Sleep(100 * time.Microsecond)
 
 	assert.True(s.T(), s.state.Connected())
 }
@@ -239,7 +237,45 @@ func (s *ConnectionStateTestSuite) TestNewConnectionString() {
 }
 
 func (s *ConnectionStateTestSuite) TestExpiredSession() {
+	s.connStrTimes = 3
+	s.dialTimes = 2
+	s.connCloseTimes = 2
 
+	s.Start()
+	defer s.Close()
+
+	instanceIndex := s.state.InstanceIndex()
+
+	// get the connection
+	conn, err := s.state.Conn()
+
+	assert.NotNil(s.T(), conn)
+	assert.NoError(s.T(), err)
+
+	// receive StateHasSession event
+	s.tracer.On("AddTime", "connection-state-parent-process", mock.AnythingOfType("Duration")).Return().Twice()
+
+	s.events <- zk.Event{
+		Type:  zk.EventSession,
+		State: zk.StateHasSession,
+	}
+
+	time.Sleep(100 * time.Microsecond)
+
+	assert.True(s.T(), s.state.Connected())
+
+	// receive StateExpired event
+	s.tracer.On("AddCount", "session-expired", 1).Return().Once()
+
+	s.events <- zk.Event{
+		Type:  zk.EventSession,
+		State: zk.StateExpired,
+	}
+
+	time.Sleep(100 * time.Microsecond)
+
+	assert.Equal(s.T(), instanceIndex+1, s.state.InstanceIndex())
+	assert.False(s.T(), s.state.Connected())
 }
 
 func (s *ConnectionStateTestSuite) TestParentWatcher() {
