@@ -113,8 +113,7 @@ func (c *ListenerContainer) Remove(listener interface{}) {
 
 	for i, l := range c.listeners {
 		if l == listener {
-			copy(c.listeners[i:], c.listeners[i+1:])
-			c.listeners = c.listeners[:len(c.listeners)-1]
+			c.listeners = append(c.listeners[:i], c.listeners[i+1:]...)
 			break
 		}
 	}
