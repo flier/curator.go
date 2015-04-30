@@ -31,6 +31,8 @@ func NewWatchers(watchers ...Watcher) *Watchers {
 	return &Watchers{watchers: watchers}
 }
 
+func (w *Watchers) Len() int { return len(w.watchers) }
+
 func (w *Watchers) Add(watcher Watcher) Watcher {
 	w.lock.Lock()
 
@@ -47,9 +49,7 @@ func (w *Watchers) Remove(watcher Watcher) Watcher {
 
 	for i, v := range w.watchers {
 		if v == watcher {
-			copy(w.watchers[i:], w.watchers[i+1:])
-
-			w.watchers = w.watchers[:len(w.watchers)-1]
+			w.watchers = append(w.watchers[:i], w.watchers[i+1:]...)
 
 			return watcher
 		}
