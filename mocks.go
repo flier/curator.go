@@ -451,6 +451,260 @@ func (h *mockEnsurePathHelper) Ensure(client *CuratorZookeeperClient, path strin
 	return err
 }
 
+type mockCuratorFramework struct {
+	mock.Mock
+
+	log infof
+}
+
+func (c *mockCuratorFramework) Start() error {
+	err := c.Called().Error(0)
+
+	if c.log != nil {
+		c.log("CuratorFramework.Start() error=%v", err)
+	}
+
+	return err
+}
+
+func (c *mockCuratorFramework) Close() error {
+	err := c.Called().Error(0)
+
+	if c.log != nil {
+		c.log("CuratorFramework.Close() error=%v", err)
+	}
+
+	return err
+}
+
+func (c *mockCuratorFramework) State() State {
+	state, _ := c.Called().Get(0).(State)
+
+	if c.log != nil {
+		c.log("CuratorFramework.State() State=%v", state)
+	}
+
+	return state
+}
+
+func (c *mockCuratorFramework) Started() bool {
+	started := c.Called().Bool(0)
+
+	if c.log != nil {
+		c.log("CuratorFramework.Started() started=%v", started)
+	}
+
+	return started
+}
+
+func (c *mockCuratorFramework) Create() CreateBuilder {
+	builder, _ := c.Called().Get(0).(CreateBuilder)
+
+	if c.log != nil {
+		c.log("CuratorFramework.Create() CreateBuilder=%v", builder)
+	}
+
+	return builder
+}
+
+func (c *mockCuratorFramework) Delete() DeleteBuilder {
+	builder, _ := c.Called().Get(0).(DeleteBuilder)
+
+	if c.log != nil {
+		c.log("CuratorFramework.Delete() DeleteBuilder=%v", builder)
+	}
+
+	return builder
+}
+
+func (c *mockCuratorFramework) CheckExists() CheckExistsBuilder {
+	builder, _ := c.Called().Get(0).(CheckExistsBuilder)
+
+	if c.log != nil {
+		c.log("CuratorFramework.CheckExists() CheckExistsBuilder=%v", builder)
+	}
+
+	return builder
+}
+
+func (c *mockCuratorFramework) GetData() GetDataBuilder {
+	builder, _ := c.Called().Get(0).(GetDataBuilder)
+
+	if c.log != nil {
+		c.log("CuratorFramework.GetData() GetDataBuilder=%v", builder)
+	}
+
+	return builder
+}
+
+func (c *mockCuratorFramework) SetData() SetDataBuilder {
+	builder, _ := c.Called().Get(0).(SetDataBuilder)
+
+	if c.log != nil {
+		c.log("CuratorFramework.SetData() SetDataBuilder=%v", builder)
+	}
+
+	return builder
+}
+
+func (c *mockCuratorFramework) GetChildren() GetChildrenBuilder {
+	builder, _ := c.Called().Get(0).(GetChildrenBuilder)
+
+	if c.log != nil {
+		c.log("CuratorFramework.GetChildren() GetChildrenBuilder=%v", builder)
+	}
+
+	return builder
+}
+
+func (c *mockCuratorFramework) GetACL() GetACLBuilder {
+	builder, _ := c.Called().Get(0).(GetACLBuilder)
+
+	if c.log != nil {
+		c.log("CuratorFramework.GetACL() GetACLBuilder=%v", builder)
+	}
+
+	return builder
+}
+
+func (c *mockCuratorFramework) SetACL() SetACLBuilder {
+	builder, _ := c.Called().Get(0).(SetACLBuilder)
+
+	if c.log != nil {
+		c.log("CuratorFramework.SetACL() SetACLBuilder=%v", builder)
+	}
+
+	return builder
+}
+
+func (c *mockCuratorFramework) InTransaction() Transaction {
+	transaction, _ := c.Called().Get(0).(Transaction)
+
+	if c.log != nil {
+		c.log("CuratorFramework.InTransaction() Transaction=%v", transaction)
+	}
+
+	return transaction
+}
+
+func (c *mockCuratorFramework) DoSync(path string, backgroundContextObject interface{}) {
+	c.Called(path, backgroundContextObject)
+
+	if c.log != nil {
+		c.log("CuratorFramework.DoSync(path=\"%s\", backgroundContextObject=%v)", path, backgroundContextObject)
+	}
+}
+
+func (c *mockCuratorFramework) Sync() SyncBuilder {
+	builder, _ := c.Called().Get(0).(SyncBuilder)
+
+	if c.log != nil {
+		c.log("CuratorFramework.Sync() SyncBuilder=%v", builder)
+	}
+
+	return builder
+}
+
+func (c *mockCuratorFramework) ConnectionStateListenable() ConnectionStateListenable {
+	listenable, _ := c.Called().Get(0).(ConnectionStateListenable)
+
+	if c.log != nil {
+		c.log("CuratorFramework.ConnectionStateListenable() Listenable=%v", listenable)
+	}
+
+	return listenable
+}
+
+func (c *mockCuratorFramework) CuratorListenable() CuratorListenable {
+	listenable, _ := c.Called().Get(0).(CuratorListenable)
+
+	if c.log != nil {
+		c.log("CuratorFramework.CuratorListenable() Listenable=%v", listenable)
+	}
+
+	return listenable
+}
+
+func (c *mockCuratorFramework) UnhandledErrorListenable() UnhandledErrorListenable {
+	listenable, _ := c.Called().Get(0).(UnhandledErrorListenable)
+
+	if c.log != nil {
+		c.log("CuratorFramework.UnhandledErrorListenable() Listenable=%v", listenable)
+	}
+
+	return listenable
+}
+
+func (c *mockCuratorFramework) NonNamespaceView() CuratorFramework {
+	framework, _ := c.Called().Get(0).(CuratorFramework)
+
+	if c.log != nil {
+		c.log("CuratorFramework.NonNamespaceView() Framework=%v", framework)
+	}
+
+	return framework
+}
+
+func (c *mockCuratorFramework) UsingNamespace(newNamespace string) CuratorFramework {
+	framework, _ := c.Called(newNamespace).Get(0).(CuratorFramework)
+
+	if c.log != nil {
+		c.log("CuratorFramework.NonNamespaceView(newNamespace=\"%s\") Framework=%v", newNamespace, framework)
+	}
+
+	return framework
+}
+
+func (c *mockCuratorFramework) Namespace() string {
+	namespace := c.Called().String(0)
+
+	if c.log != nil {
+		c.log("CuratorFramework.Namespace() Namespace=%v", namespace)
+	}
+
+	return namespace
+}
+
+func (c *mockCuratorFramework) ZookeeperClient() *CuratorZookeeperClient {
+	client, _ := c.Called().Get(0).(*CuratorZookeeperClient)
+
+	if c.log != nil {
+		c.log("CuratorFramework.ZookeeperClient() Client=%v", client)
+	}
+
+	return client
+}
+
+func (c *mockCuratorFramework) NewNamespaceAwareEnsurePath(path string) EnsurePath {
+	ensure, _ := c.Called(path).Get(0).(EnsurePath)
+
+	if c.log != nil {
+		c.log("CuratorFramework.NewNamespaceAwareEnsurePath(path=\"%s\") EnsurePath=%v", path, ensure)
+	}
+
+	return ensure
+}
+
+func (c *mockCuratorFramework) BlockUntilConnected() error {
+	err := c.Called().Error(0)
+
+	if c.log != nil {
+		c.log("CuratorFramework.BlockUntilConnected() error=%v", err)
+	}
+
+	return err
+}
+
+func (c *mockCuratorFramework) BlockUntilConnectedTimeout(maxWaitTime time.Duration) error {
+	err := c.Called(maxWaitTime).Error(0)
+
+	if c.log != nil {
+		c.log("CuratorFramework.BlockUntilConnectedTimeout(maxWaitTime=%v) error=%v", maxWaitTime, err)
+	}
+
+	return err
+}
+
 type mockContainer struct {
 	builder *CuratorFrameworkBuilder
 }
