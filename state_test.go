@@ -139,6 +139,31 @@ func (s *ConnectionStateTestSuite) TearDownTest() {
 	close(s.events)
 }
 
+func (s *ConnectionStateTestSuite) TestConnectFailed() {
+	// start connection
+	s.ensembleProvider.On("Start").Return(nil).Once()
+	s.ensembleProvider.On("ConnectionString").Return("connStr").Times(2)
+	s.zookeeperDialer.On("Dial", "connStr", s.sessionTimeout, s.canBeReadOnly).Return(nil, nil, zk.ErrAPIError).Times(2)
+
+	instanceIndex := s.state.InstanceIndex()
+
+	assert.Equal(s.T(), s.state.Start(), zk.ErrAPIError)
+	assert.False(s.T(), s.state.Connected())
+	assert.Equal(s.T(), instanceIndex+1, s.state.InstanceIndex())
+
+	conn, err := s.state.Conn()
+
+	assert.Nil(s.T(), conn)
+	assert.Equal(s.T(), zk.ErrAPIError, err)
+	assert.Equal(s.T(), instanceIndex+1, s.state.InstanceIndex())
+
+	// close connection
+	s.ensembleProvider.On("Close").Return(nil).Once()
+
+	assert.NoError(s.T(), s.state.Close())
+	assert.Equal(s.T(), instanceIndex+1, s.state.InstanceIndex())
+}
+
 func (s *ConnectionStateTestSuite) TestConnectionTimeout() {
 	s.connStrTimes = 2
 

@@ -87,6 +87,10 @@ func (h *handleHolder) getZookeeperConnection() (ZookeeperConnection, error) {
 }
 
 func (h *handleHolder) closeAndClear() error {
+	if _, ok := h.helper.(*zookeeperFactory); ok {
+		return nil
+	}
+
 	err := h.internalClose()
 
 	h.helper = nil
