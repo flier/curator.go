@@ -403,6 +403,26 @@ func (s *ConnectionStateManagerTestSuite) TearDownTest() {
 	s.receivedStates = nil
 }
 
+func (s *ConnectionStateManagerTestSuite) TestPostState() {
+	assert.NoError(s.T(), s.state.Start())
+
+	for i := 0; i < STATE_QUEUE_SIZE; i++ {
+		s.state.postState(CONNECTED)
+	}
+
+	for i := 0; i < STATE_QUEUE_SIZE; i++ {
+		s.state.postState(RECONNECTED)
+	}
+
+	state := <-s.state.events
+
+	assert.Equal(s.T(), RECONNECTED, state)
+
+	s.state.Close()
+
+	s.state.postState(LOST)
+}
+
 func (s *ConnectionStateManagerTestSuite) TestStateChange() {
 	// return false before StateManager.Start
 	assert.False(s.T(), s.state.AddStateChange(CONNECTED))

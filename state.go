@@ -515,6 +515,10 @@ func (m *connectionStateManager) Connected() bool {
 }
 
 func (m *connectionStateManager) postState(state ConnectionState) {
+	defer func() {
+		recover() // channel closed
+	}()
+
 	for {
 		select {
 		case m.events <- state:
@@ -523,8 +527,12 @@ func (m *connectionStateManager) postState(state ConnectionState) {
 		}
 
 		select {
-		case <-m.events:
-			log.Printf("ConnectionStateManager queue full - dropping events to make room")
+		case _, ok := <-m.events:
+			if ok {
+				log.Printf("ConnectionStateManager queue full - dropping events to make room")
+			} else {
+				return // channel closed
+			}
 
 		default:
 		}
