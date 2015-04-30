@@ -237,8 +237,10 @@ func (s *connectionState) checkTimeout() error {
 	if elapsed >= minTimeout {
 		if s.zooKeeper.hasNewConnectionString() {
 			s.handleNewConnectionString()
-		} else if elapsed > maxTimeout {
-			log.Printf("Connection attempt unsuccessful after %d (greater than max timeout of %v). Resetting connection and trying again with a new connection.", elapsed, maxTimeout)
+		} else if elapsed >= maxTimeout {
+			log.Printf("Connection attempt unsuccessful after %v (greater than max timeout of %v). Resetting connection and trying again with a new connection.", elapsed, maxTimeout)
+
+			s.tracer.AddCount("session-timed-out", 1)
 
 			return s.reset()
 		} else {
