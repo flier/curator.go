@@ -52,7 +52,13 @@ func (b *AtomicBool) Load() bool {
 }
 
 func (b *AtomicBool) Swap(v bool) bool {
-	return atomic.SwapInt32((*int32)(unsafe.Pointer(b)), int32(FALSE)) != int32(FALSE)
+	var n AtomicBool
+
+	if v {
+		n = TRUE
+	}
+
+	return atomic.SwapInt32((*int32)(unsafe.Pointer(b)), int32(n)) != int32(FALSE)
 }
 
 func (b *AtomicBool) Set(v bool) { b.Swap(v) }

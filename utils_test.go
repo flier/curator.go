@@ -52,6 +52,10 @@ func TestAtomicBool(t *testing.T) {
 	assert.True(t, b.CompareAndSwap(false, true))
 
 	assert.True(t, b.Load())
+
+	assert.True(t, b.Swap(false))
+	assert.False(t, b.Swap(true))
+	assert.True(t, b.Load())
 }
 
 func TestState(t *testing.T) {
