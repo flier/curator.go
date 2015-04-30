@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/samuel/go-zookeeper/zk"
 )
 
@@ -237,10 +236,7 @@ func (c *curatorFramework) Close() error {
 
 	c.listeners.Clear()
 	c.unhandledErrorListeners.Clear()
-
-	if err := c.stateManager.Close(); err != nil {
-		glog.Errorf("fail to close state manager, %s", err)
-	}
+	c.stateManager.Close()
 
 	return c.client.Close()
 }
@@ -318,7 +314,7 @@ func (c *curatorFramework) Sync() SyncBuilder {
 }
 
 func (c *curatorFramework) ConnectionStateListenable() ConnectionStateListenable {
-	return c.stateManager.listeners
+	return c.stateManager.Listenable()
 }
 
 func (c *curatorFramework) CuratorListenable() CuratorListenable {
