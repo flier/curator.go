@@ -6,6 +6,7 @@ import (
 
 	"github.com/samuel/go-zookeeper/zk"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -137,20 +138,6 @@ func (s *ConnectionStateTestSuite) TearDownTest() {
 	close(s.events)
 }
 
-func (s *ConnectionStateTestSuite) TestConnected() {
-	s.Start()
-	defer s.Close()
-
-	instanceIndex := s.state.InstanceIndex()
-
-	// get the connection
-	conn, err := s.state.Conn()
-
-	assert.NotNil(s.T(), conn)
-	assert.NoError(s.T(), err)
-	assert.Equal(s.T(), instanceIndex, s.state.InstanceIndex())
-}
-
 func (s *ConnectionStateTestSuite) TestConnectionTimeout() {
 	s.connStrTimes = 2
 
@@ -215,6 +202,36 @@ func (s *ConnectionStateTestSuite) TestBackgroundException() {
 	}
 
 	assert.Equal(s.T(), ErrConnectionLoss, s.state.dequeBackgroundException())
+}
+
+func (s *ConnectionStateTestSuite) TestConnected() {
+	s.connStrTimes = 2
+
+	s.Start()
+	defer s.Close()
+
+	instanceIndex := s.state.InstanceIndex()
+
+	// get the connection
+	conn, err := s.state.Conn()
+
+	assert.NotNil(s.T(), conn)
+	assert.NoError(s.T(), err)
+	assert.Equal(s.T(), instanceIndex, s.state.InstanceIndex())
+
+	// receive a session event
+	s.tracer.On("AddTime", "connection-state-parent-process", mock.AnythingOfType("Duration")).Return().Once()
+
+	s.events <- zk.Event{
+		Type:  zk.EventSession,
+		State: zk.StateHasSession,
+	}
+
+	for i := 0; i < 10 && !s.state.Connected(); i++ {
+		time.Sleep(100 * time.Microsecond)
+	}
+
+	assert.True(s.T(), s.state.Connected())
 }
 
 func (s *ConnectionStateTestSuite) TestNewConnectionString() {

@@ -268,16 +268,17 @@ func (s *connectionState) process(event *zk.Event) {
 		}()
 	}
 
-	wasConnected := s.isConnected.Load()
-	newIsConnected := wasConnected
-
 	if event.Type == zk.EventSession {
-		newIsConnected = s.checkState(event.State, event.Err, wasConnected)
-	}
+		wasConnected := s.isConnected.Load()
 
-	if wasConnected != newIsConnected {
-		s.isConnected.Set(newIsConnected)
-		s.connectionStart = time.Now()
+		log.Printf("Connection state changed to %s when connected=%v", event.State, wasConnected)
+
+		if newIsConnected := s.checkState(event.State, event.Err, wasConnected); newIsConnected != wasConnected {
+			log.Printf("Connection state changed to %s, connected from %v to %v", event.State, wasConnected, newIsConnected)
+
+			s.isConnected.Set(newIsConnected)
+			s.connectionStart = time.Now()
+		}
 	}
 }
 
