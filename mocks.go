@@ -90,7 +90,7 @@ func (p *mockEnsembleProvider) Start() error {
 	err := p.Called().Error(0)
 
 	if p.log != nil {
-		p.log("Start() error=%v", err)
+		p.log("EnsembleProvider.Start() error=%v", err)
 	}
 
 	return err
@@ -100,7 +100,7 @@ func (p *mockEnsembleProvider) Close() error {
 	err := p.Called().Error(0)
 
 	if p.log != nil {
-		p.log("Close() error=%v", err)
+		p.log("EnsembleProvider.Close() error=%v", err)
 	}
 
 	return err
@@ -110,7 +110,7 @@ func (p *mockEnsembleProvider) ConnectionString() string {
 	connStr := p.Called().String(0)
 
 	if p.log != nil {
-		p.log("ConnectionString() \"%v\"", connStr)
+		p.log("EnsembleProvider.ConnectionString() \"%v\"", connStr)
 	}
 
 	return connStr
@@ -130,6 +130,10 @@ func (c *mockConn) AddAuth(scheme string, auth []byte) error {
 }
 
 func (c *mockConn) Close() {
+	if c.log != nil {
+		c.log("ZookeeperConnection.Close()")
+	}
+
 	c.Called()
 }
 
