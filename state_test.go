@@ -1,6 +1,7 @@
 package curator
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -446,5 +447,65 @@ func (s *ConnectionStateManagerTestSuite) TestStateChange() {
 }
 
 func (s *ConnectionStateManagerTestSuite) TestBlockUntilConnected() {
+	var wc sync.WaitGroup
 
+	assert.NoError(s.T(), s.state.Start())
+
+	defer s.state.Close()
+
+	wc.Add(1)
+
+	go func() {
+		defer wc.Done()
+
+		assert.NoError(s.T(), s.state.BlockUntilConnected(0))
+	}()
+
+	s.state.AddStateChange(CONNECTED)
+
+	wc.Wait()
+
+	assert.Equal(s.T(), CONNECTED, s.state.currentConnectionState)
+}
+
+func (s *ConnectionStateManagerTestSuite) TestBlockUntilConnectedWithTimeout() {
+	var wc sync.WaitGroup
+
+	assert.NoError(s.T(), s.state.Start())
+
+	defer s.state.Close()
+
+	wc.Add(1)
+
+	go func() {
+		defer wc.Done()
+
+		assert.NoError(s.T(), s.state.BlockUntilConnected(100*time.Microsecond))
+	}()
+
+	s.state.AddStateChange(CONNECTED)
+
+	wc.Wait()
+
+	assert.Equal(s.T(), CONNECTED, s.state.currentConnectionState)
+}
+
+func (s *ConnectionStateManagerTestSuite) TestBlockUntilConnectedTimeouted() {
+	var wc sync.WaitGroup
+
+	assert.NoError(s.T(), s.state.Start())
+
+	defer s.state.Close()
+
+	wc.Add(1)
+
+	go func() {
+		defer wc.Done()
+
+		assert.Equal(s.T(), ErrTimeout, s.state.BlockUntilConnected(100*time.Microsecond))
+	}()
+
+	wc.Wait()
+
+	assert.Equal(s.T(), UNKNOWN, s.state.currentConnectionState)
 }

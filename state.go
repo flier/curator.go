@@ -15,6 +15,7 @@ const MAX_BACKGROUND_ERRORS = 10
 
 var (
 	ErrConnectionLoss = errors.New("connection loss")
+	ErrTimeout        = errors.New("timeout")
 )
 
 type zookeeperHelper interface {
@@ -476,10 +477,9 @@ func (m *connectionStateManager) AddStateChange(newConnectionState ConnectionSta
 }
 
 func (m *connectionStateManager) BlockUntilConnected(maxWaitTime time.Duration) error {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
 	c := make(chan ConnectionState)
+
+	defer close(c)
 
 	listener := NewConnectionStateListener(func(client CuratorFramework, newState ConnectionState) {
 		if newState.Connected() {
@@ -498,7 +498,7 @@ func (m *connectionStateManager) BlockUntilConnected(maxWaitTime time.Duration) 
 		case <-c:
 			return nil
 		case <-timer.C:
-			return errors.New("timeout")
+			return ErrTimeout
 		}
 	} else {
 		<-c
