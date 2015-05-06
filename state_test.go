@@ -441,7 +441,7 @@ func (s *ConnectionStateManagerTestSuite) TestStateChange() {
 	// automatic broadcast CONNECTED on the first time
 	assert.True(s.T(), s.state.AddStateChange(RECONNECTED))
 
-	time.Sleep(100 * time.Microsecond)
+	time.Sleep(100 * time.Millisecond)
 
 	assert.Equal(s.T(), RECONNECTED, s.state.currentConnectionState)
 	assert.Equal(s.T(), []ConnectionState{CONNECTED}, s.receivedStates)
@@ -450,7 +450,7 @@ func (s *ConnectionStateManagerTestSuite) TestStateChange() {
 	// broadcast RECONNECTED on the second time
 	assert.True(s.T(), s.state.AddStateChange(CONNECTED))
 
-	time.Sleep(100 * time.Microsecond)
+	time.Sleep(100 * time.Millisecond)
 
 	assert.Equal(s.T(), CONNECTED, s.state.currentConnectionState)
 	assert.Equal(s.T(), []ConnectionState{CONNECTED, CONNECTED}, s.receivedStates)
@@ -460,7 +460,7 @@ func (s *ConnectionStateManagerTestSuite) TestStateChange() {
 	assert.True(s.T(), s.state.SetToSuspended())
 	assert.Equal(s.T(), SUSPENDED, s.state.currentConnectionState)
 
-	time.Sleep(100 * time.Microsecond)
+	time.Sleep(100 * time.Millisecond)
 
 	assert.False(s.T(), s.state.SetToSuspended())
 	assert.Equal(s.T(), []ConnectionState{CONNECTED, CONNECTED, SUSPENDED}, s.receivedStates)
@@ -481,6 +481,8 @@ func (s *ConnectionStateManagerTestSuite) TestBlockUntilConnected() {
 		assert.NoError(s.T(), s.state.BlockUntilConnected(0))
 	}()
 
+	time.Sleep(100 * time.Millisecond)
+
 	s.state.AddStateChange(CONNECTED)
 
 	wc.Wait()
@@ -500,8 +502,10 @@ func (s *ConnectionStateManagerTestSuite) TestBlockUntilConnectedWithTimeout() {
 	go func() {
 		defer wc.Done()
 
-		assert.NoError(s.T(), s.state.BlockUntilConnected(100*time.Microsecond))
+		assert.NoError(s.T(), s.state.BlockUntilConnected(time.Second))
 	}()
+
+	time.Sleep(100 * time.Millisecond)
 
 	s.state.AddStateChange(CONNECTED)
 
@@ -522,7 +526,7 @@ func (s *ConnectionStateManagerTestSuite) TestBlockUntilConnectedTimeouted() {
 	go func() {
 		defer wc.Done()
 
-		assert.Equal(s.T(), ErrTimeout, s.state.BlockUntilConnected(100*time.Microsecond))
+		assert.Equal(s.T(), ErrTimeout, s.state.BlockUntilConnected(100*time.Millisecond))
 	}()
 
 	wc.Wait()

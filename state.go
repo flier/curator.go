@@ -373,8 +373,16 @@ const (
 	READ_ONLY                   // The connection has gone into read-only mode.
 )
 
+var connectionStateNames = []string{
+	"UNKNOWN", "CONNECTED", "SUSPENDED", "RECONNECTED", "LOST", "READ_ONLY",
+}
+
 func (s ConnectionState) Connected() bool {
 	return s == CONNECTED || s == RECONNECTED || s == READ_ONLY
+}
+
+func (s ConnectionState) String() string {
+	return connectionStateNames[s]
 }
 
 const STATE_QUEUE_SIZE = 25
@@ -477,6 +485,10 @@ func (m *connectionStateManager) AddStateChange(newConnectionState ConnectionSta
 }
 
 func (m *connectionStateManager) BlockUntilConnected(maxWaitTime time.Duration) error {
+	if m.currentConnectionState.Connected() {
+		return nil
+	}
+
 	c := make(chan ConnectionState)
 
 	defer close(c)
@@ -528,9 +540,7 @@ func (m *connectionStateManager) postState(state ConnectionState) {
 
 		select {
 		case _, ok := <-m.events:
-			if ok {
-				log.Printf("ConnectionStateManager queue full - dropping events to make room")
-			} else {
+			if !ok {
 				return // channel closed
 			}
 
