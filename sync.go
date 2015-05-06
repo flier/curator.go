@@ -55,7 +55,7 @@ func (b *syncBuilder) pathInForeground(path string) (string, error) {
 
 	syncPath, _ := result.(string)
 
-	return syncPath, err
+	return b.client.unfixForNamespace(syncPath), err
 }
 
 func (b *syncBuilder) InBackground() SyncBuilder {
