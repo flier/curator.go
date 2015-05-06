@@ -156,7 +156,7 @@ func TestEnsurePath(t *testing.T) {
 
 	assert.NotNil(t, ensure2)
 
-	client := &curatorZookeeperClient{}
+	client := &mockCuratorZookeeperClient{log: t.Logf}
 
 	helper.On("Ensure", client, "/parent/child", true).Return(nil).Once()
 
@@ -167,4 +167,5 @@ func TestEnsurePath(t *testing.T) {
 	assert.NoError(t, ensure2.Ensure(client))
 
 	helper.AssertExpectations(t)
+	client.AssertExpectations(t)
 }

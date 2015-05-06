@@ -451,6 +451,85 @@ func (h *mockEnsurePathHelper) Ensure(client CuratorZookeeperClient, path string
 	return err
 }
 
+type mockCuratorZookeeperClient struct {
+	mock.Mock
+
+	log infof
+}
+
+func (c *mockCuratorZookeeperClient) Conn() (ZookeeperConnection, error) {
+	args := c.Called()
+
+	conn, _ := args.Get(0).(ZookeeperConnection)
+	err := args.Error(1)
+
+	if c.log != nil {
+		c.log("CuratorZookeeperClient.Conn() conn=%v", conn)
+	}
+
+	return conn, err
+}
+
+func (c *mockCuratorZookeeperClient) NewRetryLoop() RetryLoop {
+	retryLoop, _ := c.Called().Get(0).(RetryLoop)
+
+	if c.log != nil {
+		c.log("CuratorZookeeperClient.NewRetryLoop() retryLoop=%v", retryLoop)
+	}
+
+	return retryLoop
+}
+
+func (c *mockCuratorZookeeperClient) Connected() bool {
+	connected := c.Called().Bool(0)
+
+	if c.log != nil {
+		c.log("CuratorZookeeperClient.Connected() connected=%v", connected)
+	}
+
+	return connected
+}
+
+func (c *mockCuratorZookeeperClient) BlockUntilConnectedOrTimedOut() error {
+	err := c.Called().Error(0)
+
+	if c.log != nil {
+		c.log("CuratorZookeeperClient.BlockUntilConnectedOrTimedOut() error=%v", err)
+	}
+
+	return err
+}
+
+func (c *mockCuratorZookeeperClient) Start() error {
+	err := c.Called().Error(0)
+
+	if c.log != nil {
+		c.log("CuratorZookeeperClient.Start() error=%v", err)
+	}
+
+	return err
+}
+
+func (c *mockCuratorZookeeperClient) Close() error {
+	err := c.Called().Error(0)
+
+	if c.log != nil {
+		c.log("CuratorZookeeperClient.Close() error=%v", err)
+	}
+
+	return err
+}
+
+func (c *mockCuratorZookeeperClient) StartTracer(name string) Tracer {
+	tracer, _ := c.Called(name).Get(0).(Tracer)
+
+	if c.log != nil {
+		c.log("CuratorZookeeperClient.StartTracer(name=\"%s\") tracer=%v", name, tracer)
+	}
+
+	return tracer
+}
+
 type mockCuratorFramework struct {
 	mock.Mock
 
