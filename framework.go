@@ -149,7 +149,7 @@ func (b *CuratorFrameworkBuilder) Build() CuratorFramework {
 
 // Set the list of servers to connect to.
 func (b *CuratorFrameworkBuilder) ConnectString(connectString string) *CuratorFrameworkBuilder {
-	b.EnsembleProvider = &fixedEnsembleProvider{connectString}
+	b.EnsembleProvider = &FixedEnsembleProvider{connectString}
 
 	return b
 }

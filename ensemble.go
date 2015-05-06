@@ -1,5 +1,6 @@
 package curator
 
+// Abstraction that provides the ZooKeeper connection string
 type EnsembleProvider interface {
 	// Curator will call this method when CuratorZookeeperClient.Start() is called
 	Start() error
@@ -11,12 +12,17 @@ type EnsembleProvider interface {
 	ConnectionString() string
 }
 
-type fixedEnsembleProvider struct {
-	connectString string
+// Standard ensemble provider that wraps a fixed connection string
+type FixedEnsembleProvider struct {
+	connectString string // The connection string to use
 }
 
-func (p *fixedEnsembleProvider) Start() error { return nil }
+func NewFixedEnsembleProvider(connectString string) *FixedEnsembleProvider {
+	return &FixedEnsembleProvider{connectString}
+}
 
-func (p *fixedEnsembleProvider) Close() error { return nil }
+func (p *FixedEnsembleProvider) Start() error { return nil }
 
-func (p *fixedEnsembleProvider) ConnectionString() string { return p.connectString }
+func (p *FixedEnsembleProvider) Close() error { return nil }
+
+func (p *FixedEnsembleProvider) ConnectionString() string { return p.connectString }
