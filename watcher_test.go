@@ -3,6 +3,7 @@ package curator
 import (
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/samuel/go-zookeeper/zk"
 	"github.com/stretchr/testify/assert"
@@ -34,7 +35,7 @@ func TestWatchers(t *testing.T) {
 
 	c <- evt
 
-	runtime.Gosched()
+	time.Sleep(100 * time.Millisecond)
 
 	close(c)
 
