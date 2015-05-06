@@ -98,7 +98,7 @@ func (t *curatorTransaction) And() TransactionFinal {
 func (t *curatorTransaction) Commit() ([]TransactionResult, error) {
 	zkClient := t.client.ZookeeperClient()
 
-	result, err := zkClient.newRetryLoop().CallWithRetry(func() (interface{}, error) {
+	result, err := zkClient.NewRetryLoop().CallWithRetry(func() (interface{}, error) {
 		if conn, err := zkClient.Conn(); err != nil {
 			return nil, err
 		} else {

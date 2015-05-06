@@ -40,7 +40,7 @@ func (b *createBuilder) ForPathWithData(givenPath string, payload []byte) (strin
 }
 
 func (b *createBuilder) pathInBackground(path string, payload []byte, givenPath string) {
-	tracer := b.client.ZookeeperClient().startTracer("createBuilder.pathInBackground")
+	tracer := b.client.ZookeeperClient().StartTracer("createBuilder.pathInBackground")
 
 	defer tracer.Commit()
 
@@ -69,7 +69,7 @@ func (b *createBuilder) pathInBackground(path string, payload []byte, givenPath 
 func (b *createBuilder) pathInForeground(path string, payload []byte) (string, error) {
 	zkClient := b.client.ZookeeperClient()
 
-	result, err := zkClient.newRetryLoop().CallWithRetry(func() (interface{}, error) {
+	result, err := zkClient.NewRetryLoop().CallWithRetry(func() (interface{}, error) {
 		if conn, err := zkClient.Conn(); err != nil {
 			return nil, err
 		} else {

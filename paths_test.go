@@ -156,7 +156,7 @@ func TestEnsurePath(t *testing.T) {
 
 	assert.NotNil(t, ensure2)
 
-	client := &CuratorZookeeperClient{}
+	client := &curatorZookeeperClient{}
 
 	helper.On("Ensure", client, "/parent/child", true).Return(nil).Once()
 

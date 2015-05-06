@@ -409,7 +409,7 @@ type mockEnsurePath struct {
 	log infof
 }
 
-func (e *mockEnsurePath) Ensure(client *CuratorZookeeperClient) error {
+func (e *mockEnsurePath) Ensure(client CuratorZookeeperClient) error {
 	args := e.Mock.Called(client)
 
 	err := args.Error(0)
@@ -439,7 +439,7 @@ type mockEnsurePathHelper struct {
 	log infof
 }
 
-func (h *mockEnsurePathHelper) Ensure(client *CuratorZookeeperClient, path string, makeLastNode bool) error {
+func (h *mockEnsurePathHelper) Ensure(client CuratorZookeeperClient, path string, makeLastNode bool) error {
 	args := h.Called(client, path, makeLastNode)
 
 	err := args.Error(0)
@@ -665,8 +665,8 @@ func (c *mockCuratorFramework) Namespace() string {
 	return namespace
 }
 
-func (c *mockCuratorFramework) ZookeeperClient() *CuratorZookeeperClient {
-	client, _ := c.Called().Get(0).(*CuratorZookeeperClient)
+func (c *mockCuratorFramework) ZookeeperClient() CuratorZookeeperClient {
+	client, _ := c.Called().Get(0).(CuratorZookeeperClient)
 
 	if c.log != nil {
 		c.log("CuratorFramework.ZookeeperClient() Client=%v", client)

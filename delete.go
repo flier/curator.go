@@ -24,7 +24,7 @@ func (b *deleteBuilder) ForPath(givenPath string) error {
 }
 
 func (b *deleteBuilder) pathInBackground(path string, givenPath string) {
-	tracer := b.client.ZookeeperClient().startTracer("deleteBuilder.pathInBackground")
+	tracer := b.client.ZookeeperClient().StartTracer("deleteBuilder.pathInBackground")
 
 	defer tracer.Commit()
 
@@ -51,9 +51,7 @@ func (b *deleteBuilder) pathInBackground(path string, givenPath string) {
 func (b *deleteBuilder) pathInForeground(path string, givenPath string) error {
 	zkClient := b.client.ZookeeperClient()
 
-	retryLoop := zkClient.newRetryLoop()
-
-	_, err := retryLoop.CallWithRetry(func() (interface{}, error) {
+	_, err := zkClient.NewRetryLoop().CallWithRetry(func() (interface{}, error) {
 		conn, err := zkClient.Conn()
 
 		if err == nil {

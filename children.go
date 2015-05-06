@@ -28,7 +28,7 @@ func (b *getChildrenBuilder) ForPath(givenPath string) ([]string, error) {
 }
 
 func (b *getChildrenBuilder) pathInBackground(adjustedPath, givenPath string) {
-	tracer := b.client.ZookeeperClient().startTracer("getChildrenBuilder.pathInBackground")
+	tracer := b.client.ZookeeperClient().StartTracer("getChildrenBuilder.pathInBackground")
 
 	defer tracer.Commit()
 
@@ -57,7 +57,7 @@ func (b *getChildrenBuilder) pathInBackground(adjustedPath, givenPath string) {
 func (b *getChildrenBuilder) pathInForeground(path string) ([]string, error) {
 	zkClient := b.client.ZookeeperClient()
 
-	result, err := zkClient.newRetryLoop().CallWithRetry(func() (interface{}, error) {
+	result, err := zkClient.NewRetryLoop().CallWithRetry(func() (interface{}, error) {
 		if conn, err := zkClient.Conn(); err != nil {
 			return nil, err
 		} else {

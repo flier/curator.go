@@ -23,7 +23,7 @@ func (b *checkExistsBuilder) ForPath(givenPath string) (*zk.Stat, error) {
 }
 
 func (b *checkExistsBuilder) pathInBackground(path string) {
-	tracer := b.client.ZookeeperClient().startTracer("checkExistsBuilder.pathInBackground")
+	tracer := b.client.ZookeeperClient().StartTracer("checkExistsBuilder.pathInBackground")
 
 	defer tracer.Commit()
 
@@ -46,7 +46,7 @@ func (b *checkExistsBuilder) pathInBackground(path string) {
 func (b *checkExistsBuilder) pathInForeground(path string) (*zk.Stat, error) {
 	zkClient := b.client.ZookeeperClient()
 
-	result, err := zkClient.newRetryLoop().CallWithRetry(func() (interface{}, error) {
+	result, err := zkClient.NewRetryLoop().CallWithRetry(func() (interface{}, error) {
 		if conn, err := zkClient.Conn(); err != nil {
 			return nil, err
 		} else {

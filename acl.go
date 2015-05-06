@@ -72,7 +72,7 @@ func (b *getACLBuilder) ForPath(givenPath string) ([]zk.ACL, error) {
 }
 
 func (b *getACLBuilder) pathInBackground(path string, givenPath string) {
-	tracer := b.client.ZookeeperClient().startTracer("getACLBuilder.pathInBackground")
+	tracer := b.client.ZookeeperClient().StartTracer("getACLBuilder.pathInBackground")
 
 	defer tracer.Commit()
 
@@ -101,7 +101,7 @@ func (b *getACLBuilder) pathInBackground(path string, givenPath string) {
 func (b *getACLBuilder) pathInForeground(path string) ([]zk.ACL, error) {
 	zkClient := b.client.ZookeeperClient()
 
-	result, err := zkClient.newRetryLoop().CallWithRetry(func() (interface{}, error) {
+	result, err := zkClient.NewRetryLoop().CallWithRetry(func() (interface{}, error) {
 		if conn, err := zkClient.Conn(); err != nil {
 			return nil, err
 		} else {
@@ -174,7 +174,7 @@ func (b *setACLBuilder) ForPath(givenPath string) (*zk.Stat, error) {
 }
 
 func (b *setACLBuilder) pathInBackground(path string, givenPath string) {
-	tracer := b.client.ZookeeperClient().startTracer("setACLBuilder.pathInBackground")
+	tracer := b.client.ZookeeperClient().StartTracer("setACLBuilder.pathInBackground")
 
 	defer tracer.Commit()
 
@@ -203,7 +203,7 @@ func (b *setACLBuilder) pathInBackground(path string, givenPath string) {
 func (b *setACLBuilder) pathInForeground(path string) (*zk.Stat, error) {
 	zkClient := b.client.ZookeeperClient()
 
-	result, err := zkClient.newRetryLoop().CallWithRetry(func() (interface{}, error) {
+	result, err := zkClient.NewRetryLoop().CallWithRetry(func() (interface{}, error) {
 		if conn, err := zkClient.Conn(); err != nil {
 			return nil, err
 		} else {

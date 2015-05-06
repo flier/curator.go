@@ -90,16 +90,40 @@ func (d *DefaultZookeeperDialer) Dial(connString string, sessionTimeout time.Dur
 	return zk.ConnectWithDialer(strings.Split(connString, ","), sessionTimeout, d.Dialer)
 }
 
-type CuratorZookeeperClient struct {
+// A wrapper around Zookeeper that takes care of some low-level housekeeping
+type CuratorZookeeperClient interface {
+	// Return the managed ZK connection.
+	Conn() (ZookeeperConnection, error)
+
+	// Return a new retry loop. All operations should be performed in a retry loop
+	NewRetryLoop() RetryLoop
+
+	// Returns true if the client is current connected
+	Connected() bool
+
+	// This method blocks until the connection to ZK succeeds.
+	BlockUntilConnectedOrTimedOut() error
+
+	// Must be called after created
+	Start() error
+
+	// Close the client
+	Close() error
+
+	// Start a new tracer
+	StartTracer(name string) Tracer
+}
+
+type curatorZookeeperClient struct {
 	state        *connectionState
 	watcher      Watcher
 	started      AtomicBool
 	TracerDriver TracerDriver
-	RetryPolicy  RetryPolicy
+	retryPolicy  RetryPolicy
 }
 
 func NewCuratorZookeeperClient(zookeeperDialer ZookeeperDialer, ensembleProvider EnsembleProvider, sessionTimeout, connectionTimeout time.Duration,
-	watcher Watcher, retryPolicy RetryPolicy, canReadOnly bool, authInfos []AuthInfo) *CuratorZookeeperClient {
+	watcher Watcher, retryPolicy RetryPolicy, canReadOnly bool, authInfos []AuthInfo) *curatorZookeeperClient {
 
 	if sessionTimeout < connectionTimeout {
 		log.Printf("session timeout [%d] is less than connection timeout [%d]", sessionTimeout, connectionTimeout)
@@ -123,14 +147,14 @@ func NewCuratorZookeeperClient(zookeeperDialer ZookeeperDialer, ensembleProvider
 
 	tracer := newDefaultTracerDriver()
 
-	return &CuratorZookeeperClient{
+	return &curatorZookeeperClient{
 		state:        newConnectionState(dialer, ensembleProvider, sessionTimeout, connectionTimeout, watcher, tracer, canReadOnly),
 		TracerDriver: tracer,
-		RetryPolicy:  retryPolicy,
+		retryPolicy:  retryPolicy,
 	}
 }
 
-func (c *CuratorZookeeperClient) Start() error {
+func (c *curatorZookeeperClient) Start() error {
 	if !c.started.CompareAndSwap(false, true) {
 		return errors.New("Already started")
 	}
@@ -138,30 +162,29 @@ func (c *CuratorZookeeperClient) Start() error {
 	return c.state.Start()
 }
 
-func (c *CuratorZookeeperClient) Close() error {
+func (c *curatorZookeeperClient) Close() error {
 	c.started.Set(false)
 
 	return c.state.Close()
 }
 
-// Returns true if the client is current connected
-func (c *CuratorZookeeperClient) IsConnected() bool {
+func (c *curatorZookeeperClient) Connected() bool {
 	return c.state.Connected()
 }
 
-func (c *CuratorZookeeperClient) CurrentConnectionString() string {
+func (c *curatorZookeeperClient) CurrentConnectionString() string {
 	return c.state.ensembleProvider.ConnectionString()
 }
 
-func (c *CuratorZookeeperClient) newRetryLoop() *retryLoop {
-	return newRetryLoop(c.RetryPolicy, c.TracerDriver)
+func (c *curatorZookeeperClient) NewRetryLoop() RetryLoop {
+	return newRetryLoop(c.retryPolicy, c.TracerDriver)
 }
 
-func (c *CuratorZookeeperClient) startTracer(name string) Tracer {
+func (c *curatorZookeeperClient) StartTracer(name string) Tracer {
 	return newTimeTracer(name, c.TracerDriver)
 }
 
-func (c *CuratorZookeeperClient) Conn() (ZookeeperConnection, error) {
+func (c *curatorZookeeperClient) Conn() (ZookeeperConnection, error) {
 	if !c.started.Load() {
 		return nil, errors.New("Client is not started")
 	}
@@ -169,13 +192,12 @@ func (c *CuratorZookeeperClient) Conn() (ZookeeperConnection, error) {
 	return c.state.Conn()
 }
 
-// This method blocks until the connection to ZK succeeds.
-func (c *CuratorZookeeperClient) BlockUntilConnectedOrTimedOut() error {
+func (c *curatorZookeeperClient) BlockUntilConnectedOrTimedOut() error {
 	if !c.started.Load() {
 		return errors.New("Client is not started")
 	}
 
-	tracer := c.startTracer("blockUntilConnectedOrTimedOut")
+	tracer := c.StartTracer("blockUntilConnectedOrTimedOut")
 
 	defer tracer.Commit()
 
@@ -188,7 +210,7 @@ func (c *CuratorZookeeperClient) BlockUntilConnectedOrTimedOut() error {
 	return errors.New("Client connect timeouted")
 }
 
-func (c *CuratorZookeeperClient) internalBlockUntilConnectedOrTimedOut() error {
+func (c *curatorZookeeperClient) internalBlockUntilConnectedOrTimedOut() error {
 	timer := time.NewTimer(c.state.connectionTimeout)
 	connected := make(chan error)
 

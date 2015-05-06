@@ -216,14 +216,14 @@ func DeleteChildren(conn ZookeeperConnection, path string, deleteSelf bool) erro
 type EnsurePath interface {
 	// First time, synchronizes and makes sure all nodes in the path are created.
 	// Subsequent calls with this instance are NOPs.
-	Ensure(client *CuratorZookeeperClient) error
+	Ensure(client CuratorZookeeperClient) error
 
 	// Returns a view of this EnsurePath instance that does not make the last node.
 	ExcludingLast() EnsurePath
 }
 
 type EnsurePathHelper interface {
-	Ensure(client *CuratorZookeeperClient, path string, makeLastNode bool) error
+	Ensure(client CuratorZookeeperClient, path string, makeLastNode bool) error
 }
 
 type ensurePathHelper struct {
@@ -232,12 +232,12 @@ type ensurePathHelper struct {
 	started bool
 }
 
-func (h *ensurePathHelper) Ensure(client *CuratorZookeeperClient, path string, makeLastNode bool) error {
+func (h *ensurePathHelper) Ensure(client CuratorZookeeperClient, path string, makeLastNode bool) error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
 	if !h.started {
-		_, err := client.newRetryLoop().CallWithRetry(func() (interface{}, error) {
+		_, err := client.NewRetryLoop().CallWithRetry(func() (interface{}, error) {
 			if conn, err := client.Conn(); err != nil {
 				return nil, err
 			} else if err := MakeDirs(conn, path, makeLastNode, h.owner.aclProvider); err != nil {
@@ -298,7 +298,7 @@ func (p *ensurePath) ExcludingLast() EnsurePath {
 	}
 }
 
-func (p *ensurePath) Ensure(client *CuratorZookeeperClient) error {
+func (p *ensurePath) Ensure(client CuratorZookeeperClient) error {
 	if p.helper != nil {
 		return p.helper.Ensure(client, p.path, p.makeLastNode)
 	}

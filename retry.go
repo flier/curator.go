@@ -33,6 +33,12 @@ func (s *defaultRetrySleeper) SleepFor(d time.Duration) error {
 	return nil
 }
 
+// Mechanism to perform an operation on Zookeeper that is safe against disconnections and "recoverable" errors.
+type RetryLoop interface {
+	// creates a retry loop calling the given proc and retrying if needed
+	CallWithRetry(proc func() (interface{}, error)) (interface{}, error)
+}
+
 type retryLoop struct {
 	done         bool
 	retryCount   int
@@ -63,7 +69,6 @@ func (l *retryLoop) ShouldRetry(err error) bool {
 	return false
 }
 
-// creates a retry loop calling the given proc and retrying if needed
 func (l *retryLoop) CallWithRetry(proc func() (interface{}, error)) (interface{}, error) {
 	for {
 		if ret, err := proc(); err == nil || !l.ShouldRetry(err) {

@@ -81,7 +81,7 @@ type CuratorFramework interface {
 	Namespace() string
 
 	// Return the managed zookeeper client
-	ZookeeperClient() *CuratorZookeeperClient
+	ZookeeperClient() CuratorZookeeperClient
 
 	// Allocates an ensure path instance that is namespace aware
 	NewNamespaceAwareEnsurePath(path string) EnsurePath
@@ -171,7 +171,7 @@ func (b *CuratorFrameworkBuilder) Compression(name string) *CuratorFrameworkBuil
 }
 
 type curatorFramework struct {
-	client                  *CuratorZookeeperClient
+	client                  *curatorZookeeperClient
 	stateManager            *connectionStateManager
 	namespaceFacadeCache    *namespaceFacadeCache
 	state                   State
@@ -364,7 +364,7 @@ func (c *curatorFramework) getNamespaceWatcher(watcher Watcher) Watcher {
 	return watcher
 }
 
-func (c *curatorFramework) ZookeeperClient() *CuratorZookeeperClient {
+func (c *curatorFramework) ZookeeperClient() CuratorZookeeperClient {
 	return c.client
 }
 
