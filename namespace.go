@@ -3,6 +3,7 @@ package curator
 import (
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 )
@@ -48,6 +49,8 @@ func (n *namespaceImpl) fixForNamespace(path string, isSequential bool) string {
 
 	s, _ := FixForNamespace(n.namespace, path, isSequential)
 
+	log.Printf("fix path `%s` with namespace `%s` to `%s`", path, n.namespace, s)
+
 	return s
 }
 
@@ -68,15 +71,19 @@ func (n *namespaceImpl) unfixForNamespace(path string) string {
 }
 
 type namespaceFacade struct {
-	*curatorFramework
-	namespace *namespaceImpl
+	curatorFramework
 }
 
 func newNamespaceFacade(client *curatorFramework, namespace string) *namespaceFacade {
-	return &namespaceFacade{
-		curatorFramework: client,
-		namespace:        newNamespace(client, namespace),
+	facade := &namespaceFacade{
+		curatorFramework: *client,
 	}
+
+	facade.namespace = newNamespace(client, namespace)
+	facade.fixForNamespace = facade.namespace.fixForNamespace
+	facade.unfixForNamespace = facade.namespace.unfixForNamespace
+
+	return facade
 }
 
 func (f *namespaceFacade) Start() error {
@@ -97,14 +104,6 @@ func (f *namespaceFacade) Namespace() string {
 	return f.namespace.namespace
 }
 
-func (f *namespaceFacade) fixForNamespace(path string, isSequential bool) string {
-	return f.namespace.fixForNamespace(path, isSequential)
-}
-
-func (f *namespaceFacade) unfixForNamespace(path string) string {
-	return f.namespace.unfixForNamespace(path)
-}
-
 type namespaceFacadeCache struct {
 	client *curatorFramework
 	cache  map[string]*namespaceFacade
@@ -123,6 +122,8 @@ func (c *namespaceFacadeCache) Get(namespace string) *namespaceFacade {
 	defer c.lock.Unlock()
 
 	if facade, exists := c.cache[namespace]; exists {
+		log.Printf("found cached facade %p for namespace `%s`", facade, namespace)
+
 		return facade
 	}
 

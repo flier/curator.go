@@ -2,6 +2,7 @@ package curator
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/samuel/go-zookeeper/zk"
@@ -173,12 +174,14 @@ func (b *CuratorFrameworkBuilder) Compression(name string) *CuratorFrameworkBuil
 type curatorFramework struct {
 	client                  *curatorZookeeperClient
 	stateManager            *connectionStateManager
-	namespaceFacadeCache    *namespaceFacadeCache
 	state                   State
 	listeners               CuratorListenable
 	unhandledErrorListeners UnhandledErrorListenable
 	defaultData             []byte
 	namespace               *namespaceImpl
+	namespaceFacadeCache    *namespaceFacadeCache
+	fixForNamespace         func(path string, isSequential bool) string
+	unfixForNamespace       func(path string) string
 	retryPolicy             RetryPolicy
 	compressionProvider     CompressionProvider
 	aclProvider             ACLProvider
@@ -207,6 +210,8 @@ func newCuratorFramework(b *CuratorFrameworkBuilder) *curatorFramework {
 	c.stateManager = newConnectionStateManager(c)
 	c.namespace = newNamespace(c, b.Namespace)
 	c.namespaceFacadeCache = newNamespaceFacadeCache(c)
+	c.fixForNamespace = c.namespace.fixForNamespace
+	c.unfixForNamespace = c.namespace.unfixForNamespace
 
 	return c
 }
@@ -333,6 +338,8 @@ func (c *curatorFramework) processEvent(event CuratorEvent) {
 }
 
 func (c *curatorFramework) logError(err error) {
+	log.Printf("error: %s", err)
+
 	c.unhandledErrorListeners.ForEach(func(listener interface{}) {
 		listener.(UnhandledErrorListener).UnhandledError(err)
 	})
@@ -350,14 +357,6 @@ func (c *curatorFramework) UsingNamespace(newNamespace string) CuratorFramework 
 
 func (c *curatorFramework) Namespace() string {
 	return c.namespace.namespace
-}
-
-func (c *curatorFramework) fixForNamespace(path string, isSequential bool) string {
-	return c.namespace.fixForNamespace(path, isSequential)
-}
-
-func (c *curatorFramework) unfixForNamespace(path string) string {
-	return c.namespace.unfixForNamespace(path)
 }
 
 func (c *curatorFramework) getNamespaceWatcher(watcher Watcher) Watcher {
