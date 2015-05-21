@@ -3,7 +3,6 @@ package curator
 import (
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 	"sync"
 )
@@ -48,8 +47,6 @@ func (n *namespaceImpl) fixForNamespace(path string, isSequential bool) string {
 	}
 
 	s, _ := FixForNamespace(n.namespace, path, isSequential)
-
-	log.Printf("fix path `%s` with namespace `%s` to `%s`", path, n.namespace, s)
 
 	return s
 }
@@ -122,8 +119,6 @@ func (c *namespaceFacadeCache) Get(namespace string) *namespaceFacade {
 	defer c.lock.Unlock()
 
 	if facade, exists := c.cache[namespace]; exists {
-		log.Printf("found cached facade %p for namespace `%s`", facade, namespace)
-
 		return facade
 	}
 
