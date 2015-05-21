@@ -5,8 +5,10 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/flier/curator.go"
@@ -76,17 +78,102 @@ func (e *ZkActionInteractiveExecutor) Handle(action *ZkAction) error {
 
 type ZkNode struct {
 	XMLName  xml.Name
+	Path     string `xml:"-"`
 	Name     string `xml:"name,attr,omitempty"`
 	Value    string `xml:"value,attr,omitempty"`
 	Ignore   *bool  `xml:"ignore,attr,omitempty"`
 	Children []*ZkNode
 }
 
+type ZkNodeVisitFunc func(node *ZkNode, first, last bool, siblings []bool) bool
+
+func (n *ZkNode) Level() int {
+	return len(strings.Split(n.Path, "/")) - 2
+}
+
+func (n *ZkNode) Visit(visitor ZkNodeVisitFunc, first, last bool, siblings []bool) bool {
+	if !visitor(n, first, last, siblings) {
+		return false
+	}
+
+	for i, child := range n.Children {
+		last := i == len(n.Children)-1
+
+		if !child.Visit(visitor, i == 0, last, append(siblings, !last)) {
+			return false
+		}
+	}
+
+	return true
+}
+
 type ZkTree interface {
 	Dump(depth int) (string, error)
 }
 
+type ZkBaseTree struct {
+	getRoot func() (*ZkNode, error)
+}
+
+func (t *ZkBaseTree) Dump(depth int) (string, error) {
+	if root, err := t.getRoot(); err != nil {
+		return "", fmt.Errorf("fail to get root, %s", err)
+	} else {
+		var buf bytes.Buffer
+
+		root.Visit(func(node *ZkNode, first, last bool, siblings []bool) bool {
+			level := len(siblings)
+
+			log.Printf("dump level #%d node @ `%s`", level, node.Path)
+
+			if len(node.Name) == 0 {
+				return true // skip root
+			}
+
+			if depth > 0 && level >= depth {
+				return false // skip depth
+			}
+
+			for _, sibling := range siblings[:level-1] {
+				if sibling {
+					fmt.Fprint(&buf, "|   ")
+				} else {
+					fmt.Fprint(&buf, "    ")
+				}
+			}
+
+			if first || last {
+				fmt.Fprintf(&buf, "+--[%s", node.Name)
+			} else {
+				fmt.Fprintf(&buf, "|--[%s", node.Name)
+			}
+
+			if len(node.Value) > 0 {
+				fmt.Fprintf(&buf, " => %s", node.Value)
+			}
+
+			fmt.Fprintln(&buf, "]")
+
+			return true
+		}, true, true, nil)
+
+		return buf.String(), nil
+	}
+}
+
+func (t *ZkBaseTree) Xml() ([]byte, error) {
+	if root, err := t.getRoot(); err != nil {
+		return nil, err
+	} else if data, err := xml.MarshalIndent(root, "", "  "); err != nil {
+		return nil, err
+	} else {
+		return []byte(xml.Header + string(data)), nil
+	}
+}
+
 type ZkLiveTree struct {
+	ZkBaseTree
+
 	client curator.CuratorFramework
 }
 
@@ -105,7 +192,11 @@ func NewZkTree(hosts []string, base string) (*ZkLiveTree, error) {
 		client = client.UsingNamespace(base)
 	}
 
-	return &ZkLiveTree{client}, nil
+	tree := &ZkLiveTree{client: client}
+
+	tree.getRoot = tree.Root
+
+	return tree, nil
 }
 
 // writes the in-memory ZK tree on to ZK server
@@ -143,6 +234,7 @@ func (t *ZkLiveTree) Node(znodePath string) (*ZkNode, error) {
 			XMLName: xml.Name{
 				Local: "zknode",
 			},
+			Path:     znodePath,
 			Name:     path.Base(znodePath),
 			Value:    string(data),
 			Children: nodes,
@@ -168,26 +260,15 @@ func (t *ZkLiveTree) Root() (*ZkNode, error) {
 			XMLName: xml.Name{
 				Local: "root",
 			},
+			Path:     "/",
 			Children: nodes,
 		}, nil
 	}
 }
 
-func (t *ZkLiveTree) Dump(depth int) (string, error) {
-	return "", nil
-}
-
-func (t *ZkLiveTree) Xml() ([]byte, error) {
-	if root, err := t.Root(); err != nil {
-		return nil, err
-	} else if data, err := xml.MarshalIndent(root, "", "  "); err != nil {
-		return nil, err
-	} else {
-		return []byte(xml.Header + string(data)), nil
-	}
-}
-
 type ZkLoadedTree struct {
+	ZkBaseTree
+
 	file *os.File
 	root *ZkNode
 }
@@ -205,6 +286,11 @@ func LoadZkTree(filename string) (*ZkLoadedTree, error) {
 		}
 
 		return &ZkLoadedTree{
+			ZkBaseTree: ZkBaseTree{
+				getRoot: func() (*ZkNode, error) {
+					return &node, nil
+				},
+			},
 			file: file,
 			root: &node,
 		}, nil
@@ -215,20 +301,8 @@ func (t *ZkLoadedTree) Execute(actions ZkActions, handler ZkActionHandler) error
 	return nil
 }
 
-func (t *ZkLoadedTree) Dump(depth int) (string, error) {
-	return "", nil
-}
-
 func (t *ZkLoadedTree) String() (string, error) {
 	return t.Dump(-1)
-}
-
-func (t *ZkLoadedTree) Xml() ([]byte, error) {
-	if data, err := xml.MarshalIndent(t.root, "", "  "); err != nil {
-		return nil, err
-	} else {
-		return []byte(xml.Header + string(data)), nil
-	}
 }
 
 func (t *ZkLoadedTree) Diff(tree ZkTree) (ZkActions, error) {
