@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"strings"
@@ -117,8 +118,10 @@ func main() {
 				log.Fatalf("fail to connect %s, %s", opts.zkHosts, err)
 			} else if xml, err := liveTree.Xml(); err != nil {
 				log.Fatalf("fail to dump XML from %s, %s", opts.znodePath, err)
-			} else {
+			} else if len(opts.xmlFile) == 0 {
 				os.Stdout.Write(xml)
+			} else if err := ioutil.WriteFile(opts.xmlFile, xml, 0644); err != nil {
+				log.Fatalf("fail to write XML file `%s`, %s", opts.xmlFile, err)
 			}
 
 		case "update":
