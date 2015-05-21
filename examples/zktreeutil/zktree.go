@@ -5,10 +5,8 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"path"
-	"strings"
 	"time"
 
 	"github.com/flier/curator.go"
@@ -87,13 +85,9 @@ type ZkNode struct {
 
 type ZkNodeVisitFunc func(node *ZkNode, first, last bool, siblings []bool) bool
 
-func (n *ZkNode) Level() int {
-	return len(strings.Split(n.Path, "/")) - 2
-}
-
 func (n *ZkNode) Visit(visitor ZkNodeVisitFunc, first, last bool, siblings []bool) bool {
 	if !visitor(n, first, last, siblings) {
-		return false
+		return true
 	}
 
 	for i, child := range n.Children {
@@ -124,13 +118,11 @@ func (t *ZkBaseTree) Dump(depth int) (string, error) {
 		root.Visit(func(node *ZkNode, first, last bool, siblings []bool) bool {
 			level := len(siblings)
 
-			log.Printf("dump level #%d node @ `%s`", level, node.Path)
-
 			if len(node.Name) == 0 {
 				return true // skip root
 			}
 
-			if depth > 0 && level >= depth {
+			if depth > 0 && level > depth {
 				return false // skip depth
 			}
 
@@ -167,7 +159,7 @@ func (t *ZkBaseTree) Xml() ([]byte, error) {
 	} else if data, err := xml.MarshalIndent(root, "", "  "); err != nil {
 		return nil, err
 	} else {
-		return []byte(xml.Header + string(data)), nil
+		return []byte(fmt.Sprintf("%s%s\n", xml.Header, string(data))), nil
 	}
 }
 
