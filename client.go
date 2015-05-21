@@ -129,6 +129,10 @@ func NewCuratorZookeeperClient(zookeeperDialer ZookeeperDialer, ensembleProvider
 		log.Printf("session timeout [%d] is less than connection timeout [%d]", sessionTimeout, connectionTimeout)
 	}
 
+	if zookeeperDialer == nil {
+		zookeeperDialer = &DefaultZookeeperDialer{}
+	}
+
 	dialer := NewZookeeperDialer(func(connString string, sessionTimeout time.Duration, canBeReadOnly bool) (conn ZookeeperConnection, events <-chan zk.Event, err error) {
 		conn, events, err = zookeeperDialer.Dial(connString, sessionTimeout, canBeReadOnly)
 
