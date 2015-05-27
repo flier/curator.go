@@ -74,13 +74,28 @@ func (e *ZkActionInteractiveExecutor) Handle(action *ZkAction) error {
 	return nil
 }
 
+type ZkBaseNode struct {
+	Path     string   `xml:"-"`
+	Children []ZkNode `xml:"zknode"`
+}
+
+func (n *ZkBaseNode) Len() int {
+	count := 1
+
+	for _, child := range n.Children {
+		count += child.Len()
+	}
+
+	return count
+}
+
 type ZkNode struct {
-	XMLName  xml.Name
-	Path     string `xml:"-"`
-	Name     string `xml:"name,attr,omitempty"`
-	Value    string `xml:"value,attr,omitempty"`
-	Ignore   *bool  `xml:"ignore,attr,omitempty"`
-	Children []*ZkNode
+	ZkBaseNode
+
+	XMLName xml.Name `xml:"zknode"`
+	Name    string   `xml:"name,attr,omitempty"`
+	Value   string   `xml:"value,attr,omitempty"`
+	Ignore  *bool    `xml:"ignore,attr,omitempty"`
 }
 
 type ZkNodeVisitFunc func(node *ZkNode, first, last bool, siblings []bool) bool
@@ -101,12 +116,30 @@ func (n *ZkNode) Visit(visitor ZkNodeVisitFunc, first, last bool, siblings []boo
 	return true
 }
 
+type ZkRootNode struct {
+	ZkBaseNode
+
+	XMLName xml.Name `xml:"root"`
+}
+
+func (n *ZkRootNode) Visit(visitor ZkNodeVisitFunc, first, last bool, siblings []bool) bool {
+	for i, child := range n.Children {
+		last := i == len(n.Children)-1
+
+		if !child.Visit(visitor, i == 0, last, append(siblings, !last)) {
+			return false
+		}
+	}
+
+	return true
+}
+
 type ZkTree interface {
 	Dump(depth int) (string, error)
 }
 
 type ZkBaseTree struct {
-	getRoot func() (*ZkNode, error)
+	getRoot func() (*ZkRootNode, error)
 }
 
 func (t *ZkBaseTree) Dump(depth int) (string, error) {
@@ -212,48 +245,46 @@ func (t *ZkLiveTree) Node(znodePath string) (*ZkNode, error) {
 	} else if children, err := t.client.GetChildren().ForPath(znodePath); err != nil {
 		return nil, fmt.Errorf("fail to get children of node `%s`, %s", znodePath, err)
 	} else {
-		var nodes []*ZkNode
+		var nodes []ZkNode
 
 		for _, child := range children {
 			if node, err := t.Node(path.Join(znodePath, child)); err != nil {
 				return nil, err
 			} else {
-				nodes = append(nodes, node)
+				nodes = append(nodes, *node)
 			}
 		}
 
 		return &ZkNode{
-			XMLName: xml.Name{
-				Local: "zknode",
+			ZkBaseNode: ZkBaseNode{
+				Path:     znodePath,
+				Children: nodes,
 			},
-			Path:     znodePath,
-			Name:     path.Base(znodePath),
-			Value:    string(data),
-			Children: nodes,
+			Name:  path.Base(znodePath),
+			Value: string(data),
 		}, nil
 	}
 }
 
-func (t *ZkLiveTree) Root() (*ZkNode, error) {
+func (t *ZkLiveTree) Root() (*ZkRootNode, error) {
 	if children, err := t.client.GetChildren().ForPath("/"); err != nil {
 		return nil, fmt.Errorf("fail to get children of root, %s", err)
 	} else {
-		var nodes []*ZkNode
+		var nodes []ZkNode
 
 		for _, child := range children {
 			if node, err := t.Node(path.Join("/", child)); err != nil {
 				return nil, err
 			} else {
-				nodes = append(nodes, node)
+				nodes = append(nodes, *node)
 			}
 		}
 
-		return &ZkNode{
-			XMLName: xml.Name{
-				Local: "root",
+		return &ZkRootNode{
+			ZkBaseNode: ZkBaseNode{
+				Path:     "/",
+				Children: nodes,
 			},
-			Path:     "/",
-			Children: nodes,
 		}, nil
 	}
 }
@@ -262,7 +293,7 @@ type ZkLoadedTree struct {
 	ZkBaseTree
 
 	file *os.File
-	root *ZkNode
+	root *ZkRootNode
 }
 
 func LoadZkTree(filename string) (*ZkLoadedTree, error) {
@@ -271,26 +302,30 @@ func LoadZkTree(filename string) (*ZkLoadedTree, error) {
 	} else if data, err := ioutil.ReadFile(filename); err != nil {
 		return nil, fmt.Errorf("fail to read file `%s`, %s", filename, err)
 	} else {
-		var node ZkNode
+		var root ZkRootNode
 
-		if err := xml.Unmarshal(data, &node); err != nil {
+		if err := xml.Unmarshal(data, &root); err != nil {
 			return nil, fmt.Errorf("fail to parse file `%s`, %s", filename, err)
 		}
 
 		return &ZkLoadedTree{
 			ZkBaseTree: ZkBaseTree{
-				getRoot: func() (*ZkNode, error) {
-					return &node, nil
+				getRoot: func() (*ZkRootNode, error) {
+					return &root, nil
 				},
 			},
 			file: file,
-			root: &node,
+			root: &root,
 		}, nil
 	}
 }
 
 func (t *ZkLoadedTree) Execute(actions ZkActions, handler ZkActionHandler) error {
 	return nil
+}
+
+func (t *ZkLoadedTree) Root() *ZkRootNode {
+	return t.root
 }
 
 func (t *ZkLoadedTree) String() (string, error) {

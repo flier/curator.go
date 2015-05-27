@@ -18,6 +18,7 @@ type Options struct {
 	znodePath string
 	depth     int
 	force     bool
+	debug     bool
 }
 
 func parseCmdLine() (*Options, error) {
@@ -63,6 +64,7 @@ Options:
 	flag.StringVar(&opts.znodePath, "path", "/", "Path to the zookeeper subtree rootnode.")
 	flag.IntVar(&opts.depth, "depth", -1, "Depth of the ZK tree to be dumped (ignored for XML dump).")
 	flag.BoolVar(&opts.force, "force", false, "Forces cleanup before import; also used for forceful update.")
+	flag.BoolVar(&opts.debug, "debug", false, "Enable debug mode")
 
 	flag.Parse()
 
@@ -101,6 +103,19 @@ func main() {
 
 		os.Exit(-1)
 	} else {
+		log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
+
+		if opts.debug {
+			log.SetOutput(os.Stderr)
+		} else if f, err := os.OpenFile(os.Args[0]+".log", os.O_CREATE|os.O_APPEND, 0644); err != nil {
+			log.SetOutput(os.Stderr)
+			log.Fatalf("fail to open log file, %s", err)
+		} else {
+			log.SetOutput(f)
+
+			defer f.Sync()
+		}
+
 		switch opts.cmd {
 		case "import":
 			if liveTree, err := NewZkTree(strings.Split(opts.zkHosts, ";"), opts.znodePath); err != nil {
@@ -110,7 +125,11 @@ func main() {
 			} else if err := liveTree.Write(loadedTree, opts.force); err != nil {
 				log.Fatalf("fail to write to %s, %s", opts.znodePath, err)
 			} else {
-				log.Println("import successful!")
+				log.Printf("import %d nodes from XML file `%s` successful!", loadedTree.Root().Len(), opts.xmlFile)
+
+				if xml, err := loadedTree.Xml(); err == nil {
+					log.Printf("%s", string(xml))
+				}
 			}
 
 		case "export":
@@ -122,6 +141,8 @@ func main() {
 				os.Stdout.Write(xml)
 			} else if err := ioutil.WriteFile(opts.xmlFile, xml, 0644); err != nil {
 				log.Fatalf("fail to write XML file `%s`, %s", opts.xmlFile, err)
+			} else {
+				log.Printf("wrote %d bytes to XML file `%s`", len(xml), opts.xmlFile)
 			}
 
 		case "update":
