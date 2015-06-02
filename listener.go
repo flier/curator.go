@@ -101,14 +101,20 @@ type ListenerContainer struct {
 }
 
 func (c *ListenerContainer) Add(listener interface{}) {
-	c.lock.Lock()
+	if c != nil {
+		c.lock.Lock()
 
-	c.listeners = append(c.listeners, listener)
+		c.listeners = append(c.listeners, listener)
 
-	c.lock.Unlock()
+		c.lock.Unlock()
+	}
 }
 
 func (c *ListenerContainer) Remove(listener interface{}) {
+	if c == nil {
+		return
+	}
+
 	c.lock.Lock()
 
 	for i, l := range c.listeners {
@@ -122,10 +128,18 @@ func (c *ListenerContainer) Remove(listener interface{}) {
 }
 
 func (c *ListenerContainer) Len() int {
+	if c == nil {
+		return 0
+	}
+
 	return len(c.listeners)
 }
 
 func (c *ListenerContainer) Clear() {
+	if c == nil {
+		return
+	}
+
 	c.lock.Lock()
 
 	c.listeners = nil
@@ -134,6 +148,10 @@ func (c *ListenerContainer) Clear() {
 }
 
 func (c *ListenerContainer) ForEach(callback func(interface{})) {
+	if c == nil {
+		return
+	}
+
 	c.lock.RLock()
 
 	for _, listener := range c.listeners {
