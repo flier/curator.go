@@ -37,11 +37,6 @@ Command:
             Must be specified with -zookeeper option. 
             Optionally takes -path for exporting subtree
 
-  update    Updates zookeeper tree with changes from XML file. 
-            Update operation is interactive unless specified with -force option. 
-            Must be specified with -zookeeper AND -xmlfile options. 
-            Optionally takes -path for updating subtree.
-
   diff      Creates a list of diff actions on ZK tree based on XML data. 
             Must be specified with -zookeeper OR -xmlfile options. 
             Optionally takes -path for subtree diff
@@ -145,38 +140,13 @@ func main() {
 				log.Printf("wrote %d bytes to XML file `%s`", len(xml), opts.xmlFile)
 			}
 
-		case "update":
-			if liveTree, err := NewZkTree(strings.Split(opts.zkHosts, ";"), opts.znodePath); err != nil {
-				log.Fatalf("fail to connect %s, %s", opts.zkHosts, err)
-			} else if loadedTree, err := LoadZkTree(opts.xmlFile); err != nil {
-				log.Fatalf("fail to load from %s, %s", opts.xmlFile, err)
-			} else if actions, err := liveTree.Diff(loadedTree); err != nil {
-				log.Fatalf("fail to diff tree at %s, %s", opts.znodePath, err)
-			} else {
-				var handler ZkActionHandler
-
-				if opts.force {
-					handler = &ZkActionExecutor{}
-				} else {
-					handler = &ZkActionInteractiveExecutor{}
-				}
-
-				if err := liveTree.Execute(actions, handler); err != nil {
-					log.Fatalf("fail to execute actions, %s", err)
-				} else {
-					log.Println("update successful!")
-				}
-			}
-
 		case "diff":
 			if liveTree, err := NewZkTree(strings.Split(opts.zkHosts, ";"), opts.znodePath); err != nil {
 				log.Fatalf("fail to connect %s, %s", opts.zkHosts, err)
 			} else if loadedTree, err := LoadZkTree(opts.xmlFile); err != nil {
 				log.Fatalf("fail to load from %s, %s", opts.xmlFile, err)
-			} else if actions, err := liveTree.Diff(loadedTree); err != nil {
+			} else if err := liveTree.Diff(loadedTree); err != nil {
 				log.Fatalf("fail to diff tree at %s, %s", opts.znodePath, err)
-			} else if err := liveTree.Execute(actions, &ZkActionPrinter{os.Stdout}); err != nil {
-				log.Fatalf("fail to execute actions, %s", err)
 			}
 
 		case "dump":

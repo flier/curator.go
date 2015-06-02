@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/flier/curator.go"
+	"github.com/pmezard/go-difflib/difflib"
 )
 
 // The action type; any of create/delete/setvalue.
@@ -124,6 +125,8 @@ func (c *ZkNodeContext) Path() string {
 type ZkNodeVisitFunc func(node *ZkNode, ctxt *ZkNodeContext) bool
 
 func (n *ZkNode) Visit(visitor ZkNodeVisitFunc, ctxt *ZkNodeContext) bool {
+	n.Path = path.Join(ctxt.Path(), n.Name)
+
 	if !visitor(n, ctxt) {
 		return true
 	}
@@ -280,8 +283,6 @@ func (t *ZkLiveTree) Merge(tree *ZkLoadedTree, force bool) error {
 	}
 
 	tree.Root().Visit(func(node *ZkNode, ctxt *ZkNodeContext) bool {
-		node.Path = path.Join(ctxt.Path(), node.Name)
-
 		if strings.HasPrefix(node.Path, "/zookeeper") {
 			return true
 		}
@@ -319,12 +320,46 @@ func (t *ZkLiveTree) mergeNode(node *ZkNode) error {
 }
 
 // returns a list of actions after taking a diff of in-memory ZK tree and live ZK tree.
-func (t *ZkLiveTree) Diff(tree ZkTree) (ZkActions, error) {
-	return nil, nil
+func (t *ZkLiveTree) Diff(tree *ZkLoadedTree) error {
+	tree.Root().Visit(func(node *ZkNode, ctxt *ZkNodeContext) bool {
+		if strings.HasPrefix(node.Path, "/zookeeper") {
+			return true
+		}
+
+		if err := t.diffNode(node); err != nil {
+			log.Fatalf("fail to diff node `%s`, %s", node.Path, err)
+
+			return false
+		}
+
+		return true
+	}, &ZkNodeContext{})
+
+	return nil
 }
 
-// performs create/delete/setvalue by executing a set of ZkActions on a live ZK tree.
-func (t *ZkLiveTree) Execute(actions ZkActions, handler ZkActionHandler) error {
+func (t *ZkLiveTree) diffNode(node *ZkNode) error {
+	log.Printf("diff node @ `%s`", node.Path)
+
+	diff := difflib.UnifiedDiff{
+		FromFile: "Original" + node.Path,
+		ToFile:   "Current" + node.Path,
+		Context:  3,
+	}
+
+	if data, err := t.client.GetData().ForPath(node.Path); err == nil {
+		diff.A = difflib.SplitLines(node.Value)
+		diff.B = difflib.SplitLines(string(data))
+	} else if err == curator.ErrNoNode {
+		diff.A = difflib.SplitLines(node.Value)
+	} else {
+		return err
+	}
+
+	if err := difflib.WriteUnifiedDiff(os.Stdout, diff); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -409,18 +444,10 @@ func LoadZkTree(filename string) (*ZkLoadedTree, error) {
 	}
 }
 
-func (t *ZkLoadedTree) Execute(actions ZkActions, handler ZkActionHandler) error {
-	return nil
-}
-
 func (t *ZkLoadedTree) Root() *ZkRootNode {
 	return t.root
 }
 
 func (t *ZkLoadedTree) String() (string, error) {
 	return t.Dump(-1)
-}
-
-func (t *ZkLoadedTree) Diff(tree ZkTree) (ZkActions, error) {
-	return nil, nil
 }
