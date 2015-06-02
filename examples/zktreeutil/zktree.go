@@ -124,28 +124,22 @@ func (c *ZkNodeContext) Path() string {
 
 type ZkNodeVisitFunc func(node *ZkNode, ctxt *ZkNodeContext) bool
 
-func (n *ZkNode) Visit(visitor ZkNodeVisitFunc, ctxt *ZkNodeContext) bool {
+func (n *ZkNode) Visit(visitor ZkNodeVisitFunc, ctxt *ZkNodeContext) {
 	n.Path = path.Join(ctxt.Path(), n.Name)
 
-	if !visitor(n, ctxt) {
-		return true
-	}
+	if visitor(n, ctxt) {
+		for i, child := range n.Children {
+			last := i == len(n.Children)-1
 
-	for i, child := range n.Children {
-		last := i == len(n.Children)-1
-
-		if !child.Visit(visitor, &ZkNodeContext{
-			parent:   ctxt,
-			node:     &child,
-			first:    i == 0,
-			last:     last,
-			siblings: append(ctxt.siblings, !last),
-		}) {
-			return false
+			child.Visit(visitor, &ZkNodeContext{
+				parent:   ctxt,
+				node:     &child,
+				first:    i == 0,
+				last:     last,
+				siblings: append(ctxt.siblings, !last),
+			})
 		}
 	}
-
-	return true
 }
 
 type ZkRootNode struct {
@@ -154,22 +148,18 @@ type ZkRootNode struct {
 	XMLName xml.Name `xml:"root"`
 }
 
-func (n *ZkRootNode) Visit(visitor ZkNodeVisitFunc, ctxt *ZkNodeContext) bool {
+func (n *ZkRootNode) Visit(visitor ZkNodeVisitFunc, ctxt *ZkNodeContext) {
 	for i, child := range n.Children {
 		last := i == len(n.Children)-1
 
-		if !child.Visit(visitor, &ZkNodeContext{
+		child.Visit(visitor, &ZkNodeContext{
 			parent:   ctxt,
 			node:     &child,
 			first:    i == 0,
 			last:     last,
 			siblings: append(ctxt.siblings, !last),
-		}) {
-			return false
-		}
+		})
 	}
-
-	return true
 }
 
 type ZkTree interface {
@@ -293,7 +283,15 @@ func (t *ZkLiveTree) Merge(tree *ZkLoadedTree, force bool) error {
 			return false
 		}
 
-		return true
+		if node.Ignore != nil && *node.Ignore {
+			log.Printf("ignore node @ `%s` updates", node.Path)
+
+			return false
+		} else {
+			// Go deep to write the subtree rooted in the node, if not to be ignored
+
+			return true
+		}
 	}, &ZkNodeContext{})
 
 	return nil
@@ -342,8 +340,8 @@ func (t *ZkLiveTree) diffNode(node *ZkNode) error {
 	log.Printf("diff node @ `%s`", node.Path)
 
 	diff := difflib.UnifiedDiff{
-		FromFile: "Original" + node.Path,
-		ToFile:   "Current" + node.Path,
+		FromFile: "a" + node.Path,
+		ToFile:   "b" + node.Path,
 		Context:  3,
 	}
 
