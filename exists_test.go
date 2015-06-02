@@ -33,7 +33,7 @@ func (s *CheckExistsBuilderTestSuite) TestCheckExists() {
 		stat, err := client.CheckExists().ForPath("/node")
 
 		assert.Nil(s.T(), stat)
-		assert.EqualError(s.T(), err, zk.ErrNoNode.Error())
+		assert.Nil(s.T(), err)
 	})
 
 	s.With(func(client CuratorFramework, conn *mockConn) {
@@ -54,7 +54,7 @@ func (s *CheckExistsBuilderTestSuite) TestNamespace() {
 		stat, err := client.CheckExists().ForPath("/child")
 
 		assert.Nil(s.T(), stat)
-		assert.EqualError(s.T(), err, zk.ErrNoNode.Error())
+		assert.Nil(s.T(), err)
 	})
 }
 

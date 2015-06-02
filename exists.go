@@ -68,7 +68,7 @@ func (b *checkExistsBuilder) pathInForeground(path string) (*zk.Stat, error) {
 			if err != nil {
 				return nil, err
 			} else if !exists {
-				return stat, zk.ErrNoNode
+				return nil, nil
 			} else {
 				return stat, nil
 			}
