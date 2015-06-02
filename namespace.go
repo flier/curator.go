@@ -94,7 +94,7 @@ func (f *namespaceFacade) Close() error {
 func (f *namespaceFacade) CuratorListenable() CuratorListenable {
 	f.logError(errors.New("CuratorListenable() is only available from a non-namespaced CuratorFramework instance"))
 
-	return nil
+	return f.curatorFramework.listeners
 }
 
 func (f *namespaceFacade) Namespace() string {
