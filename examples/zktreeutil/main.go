@@ -37,13 +37,17 @@ Command:
             Must be specified with -zookeeper option. 
             Optionally takes -path for exporting subtree
 
-  diff      Creates a list of diff actions on ZK tree based on XML data. 
+  diff      Diff the zookeeper tree based on XML data. 
             Must be specified with -zookeeper OR -xmlfile options. 
             Optionally takes -path for subtree diff
 
   dump      Dumps the entire ZK (sub)tree to standard output. 
             Must be specified with --zookeeper OR --xmlfile options. 
             Optionally takes --path and --depth for dumping subtree.
+
+  sync      Sync the zookeeper tree with stdin/stdout stream
+            Must be specified with -zookeeper option. 
+            Optionally takes -path for exporting subtree
 
 Options:
 
@@ -70,12 +74,12 @@ Options:
 	cmd := flag.Arg(0)
 
 	switch cmd {
-	case "import", "update", "diff":
+	case "import", "diff":
 		if len(opts.zkHosts) == 0 || len(opts.xmlFile) == 0 {
 			return nil, errors.New("missing params")
 		}
 
-	case "export", "dump":
+	case "export", "dump", "sync":
 		if len(opts.zkHosts) == 0 {
 			return nil, errors.New("missing params")
 		}
@@ -170,6 +174,13 @@ func main() {
 				log.Fatalf("fail to dump tree, %s", err)
 			} else {
 				os.Stdout.WriteString(out)
+			}
+
+		case "sync":
+			if liveTree, err := NewZkTree(strings.Split(opts.zkHosts, ";"), opts.znodePath); err != nil {
+				log.Fatalf("fail to connect %s, %s", opts.zkHosts, err)
+			} else if err := liveTree.Sync(os.Stdin, os.Stdout); err != nil {
+				log.Fatalf("fail to sync with input #%v and output #%v, %s", os.Stdin.Fd(), os.Stdout.Fd(), err)
 			}
 		}
 	}

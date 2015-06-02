@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/xml"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
@@ -100,6 +101,14 @@ type ZkNode struct {
 	Name    string   `xml:"name,attr,omitempty"`
 	Value   string   `xml:"value,attr,omitempty"`
 	Ignore  *bool    `xml:"ignore,attr,omitempty"`
+}
+
+type ZkNodeUpdate struct {
+	XMLName xml.Name `xml:"update"`
+	Path    string   `xml:"path"`
+	Action  string   `xml:"action"`
+	Name    string   `xml:"name,attr,omitempty"`
+	Value   string   `xml:"value,attr,omitempty"`
 }
 
 type ZkNodeContext struct {
@@ -357,6 +366,107 @@ func (t *ZkLiveTree) diffNode(node *ZkNode) error {
 	if err := difflib.WriteUnifiedDiff(os.Stdout, diff); err != nil {
 		return err
 	}
+
+	return nil
+}
+
+func (t *ZkLiveTree) Sync(r io.Reader, w io.Writer) error {
+	errors := make(chan error)
+	updates := make(chan *ZkNodeUpdate)
+
+	go func() {
+		decoder := xml.NewDecoder(r)
+
+		if t, err := decoder.Token(); err != nil {
+			errors <- fmt.Errorf("fail to decode `root` element, %s", err)
+		} else if e, ok := t.(xml.StartElement); !ok || e.Name.Local != "root" {
+			errors <- fmt.Errorf("missing `root` element, %v", t)
+		} else {
+			for {
+				var update ZkNodeUpdate
+
+				if err := decoder.Decode(&update); err != nil {
+					errors <- fmt.Errorf("fail to decode `update` element, %s", err)
+				} else {
+					updates <- &update
+				}
+			}
+		}
+	}()
+
+	go func() {
+		encoder := xml.NewEncoder(w)
+
+		encoder.Indent("", "  ")
+
+		if err := encoder.EncodeToken(xml.StartElement{Name: xml.Name{Local: "root"}}); err != nil {
+			errors <- fmt.Errorf("fail to encode `root` element, %s", err)
+		} else if err := encoder.Flush(); err != nil {
+			errors <- fmt.Errorf("fail to flush XML stream, %s", err)
+		} else if root, err := t.Root(); err != nil {
+			errors <- fmt.Errorf("fail to iterate live tree, %s", err)
+		} else {
+			root.Visit(func(node *ZkNode, ctxt *ZkNodeContext) bool {
+				if strings.HasPrefix(node.Path, "/zookeeper") {
+					return true
+				}
+
+				if err := encoder.Encode(ZkNodeUpdate{
+					Path:   node.Path,
+					Action: "create",
+					Name:   node.Name,
+					Value:  node.Value,
+				}); err != nil {
+					errors <- fmt.Errorf("fail to encode node @ `%s`, %s", node.Path, err)
+
+					return false
+				}
+
+				return true
+			}, &ZkNodeContext{})
+
+			t.client.CuratorListenable().AddListener(curator.NewCuratorListener(func(client curator.CuratorFramework, event curator.CuratorEvent) error {
+				update := ZkNodeUpdate{
+					Path:  event.Path(),
+					Name:  event.Name(),
+					Value: string(event.Data()),
+				}
+
+				switch event.Type() {
+				case curator.CREATE:
+					update.Action = "create"
+				case curator.SET_DATA:
+					update.Action = "set_data"
+				case curator.DELETE:
+					update.Action = "delete"
+				}
+
+				return nil
+			}))
+		}
+	}()
+
+	for {
+		select {
+		case err := <-errors:
+			return err
+
+		case update := <-updates:
+			switch update.Action {
+			case "create":
+				log.Printf("created node @ `%s` with %d bytes data", update.Path, len(update.Value))
+
+			case "delete":
+				log.Printf("delete node @ `%s`", update.Path)
+
+			case "set_data":
+				log.Printf("update node @ `%s` with %d bytes data", update.Path, len(update.Value))
+			}
+		}
+	}
+
+	close(errors)
+	close(updates)
 
 	return nil
 }
