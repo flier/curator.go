@@ -4,6 +4,24 @@ import (
 	"github.com/samuel/go-zookeeper/zk"
 )
 
+var (
+	ErrConnectionClosed        = zk.ErrConnectionClosed
+	ErrUnknown                 = zk.ErrUnknown
+	ErrAPIError                = zk.ErrAPIError
+	ErrNoNode                  = zk.ErrNoNode
+	ErrNoAuth                  = zk.ErrNoAuth
+	ErrBadVersion              = zk.ErrBadVersion
+	ErrNoChildrenForEphemerals = zk.ErrNoChildrenForEphemerals
+	ErrNodeExists              = zk.ErrNodeExists
+	ErrNotEmpty                = zk.ErrNotEmpty
+	ErrSessionExpired          = zk.ErrSessionExpired
+	ErrInvalidACL              = zk.ErrInvalidACL
+	ErrAuthFailed              = zk.ErrAuthFailed
+	ErrClosing                 = zk.ErrClosing
+	ErrNothing                 = zk.ErrNothing
+	ErrSessionMoved            = zk.ErrSessionMoved
+)
+
 const AnyVersion int32 = -1
 
 type CreateMode int32
