@@ -5,8 +5,11 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"path"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/flier/curator.go"
@@ -98,17 +101,43 @@ type ZkNode struct {
 	Ignore  *bool    `xml:"ignore,attr,omitempty"`
 }
 
-type ZkNodeVisitFunc func(node *ZkNode, first, last bool, siblings []bool) bool
+type ZkNodeContext struct {
+	parent   *ZkNodeContext
+	node     *ZkNode
+	first    bool
+	last     bool
+	siblings []bool
+}
 
-func (n *ZkNode) Visit(visitor ZkNodeVisitFunc, first, last bool, siblings []bool) bool {
-	if !visitor(n, first, last, siblings) {
+func (c *ZkNodeContext) Path() string {
+	var nodes []string
+
+	for ctxt := c.parent; ctxt.node != nil; ctxt = ctxt.parent {
+		nodes = append(nodes, ctxt.node.Name)
+	}
+
+	sort.Reverse(sort.StringSlice(nodes))
+
+	return "/" + path.Join(nodes...)
+}
+
+type ZkNodeVisitFunc func(node *ZkNode, ctxt *ZkNodeContext) bool
+
+func (n *ZkNode) Visit(visitor ZkNodeVisitFunc, ctxt *ZkNodeContext) bool {
+	if !visitor(n, ctxt) {
 		return true
 	}
 
 	for i, child := range n.Children {
 		last := i == len(n.Children)-1
 
-		if !child.Visit(visitor, i == 0, last, append(siblings, !last)) {
+		if !child.Visit(visitor, &ZkNodeContext{
+			parent:   ctxt,
+			node:     &child,
+			first:    i == 0,
+			last:     last,
+			siblings: append(ctxt.siblings, !last),
+		}) {
 			return false
 		}
 	}
@@ -122,11 +151,17 @@ type ZkRootNode struct {
 	XMLName xml.Name `xml:"root"`
 }
 
-func (n *ZkRootNode) Visit(visitor ZkNodeVisitFunc, first, last bool, siblings []bool) bool {
+func (n *ZkRootNode) Visit(visitor ZkNodeVisitFunc, ctxt *ZkNodeContext) bool {
 	for i, child := range n.Children {
 		last := i == len(n.Children)-1
 
-		if !child.Visit(visitor, i == 0, last, append(siblings, !last)) {
+		if !child.Visit(visitor, &ZkNodeContext{
+			parent:   ctxt,
+			node:     &child,
+			first:    i == 0,
+			last:     last,
+			siblings: append(ctxt.siblings, !last),
+		}) {
 			return false
 		}
 	}
@@ -148,8 +183,8 @@ func (t *ZkBaseTree) Dump(depth int) (string, error) {
 	} else {
 		var buf bytes.Buffer
 
-		root.Visit(func(node *ZkNode, first, last bool, siblings []bool) bool {
-			level := len(siblings)
+		root.Visit(func(node *ZkNode, ctxt *ZkNodeContext) bool {
+			level := len(ctxt.siblings)
 
 			if len(node.Name) == 0 {
 				return true // skip root
@@ -159,7 +194,7 @@ func (t *ZkBaseTree) Dump(depth int) (string, error) {
 				return false // skip depth
 			}
 
-			for _, sibling := range siblings[:level-1] {
+			for _, sibling := range ctxt.siblings[:level-1] {
 				if sibling {
 					fmt.Fprint(&buf, "|   ")
 				} else {
@@ -167,7 +202,7 @@ func (t *ZkBaseTree) Dump(depth int) (string, error) {
 				}
 			}
 
-			if first || last {
+			if ctxt.first || ctxt.last {
 				fmt.Fprintf(&buf, "+--[%s", node.Name)
 			} else {
 				fmt.Fprintf(&buf, "|--[%s", node.Name)
@@ -180,7 +215,7 @@ func (t *ZkBaseTree) Dump(depth int) (string, error) {
 			fmt.Fprintln(&buf, "]")
 
 			return true
-		}, true, true, nil)
+		}, &ZkNodeContext{first: true, last: true})
 
 		return buf.String(), nil
 	}
@@ -214,7 +249,9 @@ func NewZkTree(hosts []string, base string) (*ZkLiveTree, error) {
 			base = base[1:]
 		}
 
-		client = client.UsingNamespace(base)
+		if len(base) > 0 {
+			client = client.UsingNamespace(base)
+		}
 	}
 
 	tree := &ZkLiveTree{client: client}
@@ -225,7 +262,59 @@ func NewZkTree(hosts []string, base string) (*ZkLiveTree, error) {
 }
 
 // writes the in-memory ZK tree on to ZK server
-func (t *ZkLiveTree) Write(tree ZkTree, force bool) error {
+func (t *ZkLiveTree) Merge(tree *ZkLoadedTree, force bool) error {
+	if force {
+		if len(t.client.Namespace()) > 0 {
+			t.client.Delete().DeletingChildrenIfNeeded().ForPath("/")
+		} else if children, err := t.client.GetChildren().ForPath("/"); err != nil {
+			return err
+		} else {
+			for _, child := range children {
+				if child != "zookeeper" {
+					t.client.Delete().DeletingChildrenIfNeeded().ForPath(path.Join("/", child))
+				} else {
+					log.Printf("skip the `/%s` folder", child)
+				}
+			}
+		}
+	}
+
+	tree.Root().Visit(func(node *ZkNode, ctxt *ZkNodeContext) bool {
+		node.Path = path.Join(ctxt.Path(), node.Name)
+
+		if strings.HasPrefix(node.Path, "/zookeeper") {
+			return true
+		}
+
+		if err := t.mergeNode(node); err != nil {
+			log.Fatalf("fail to merge node `%s`, %s", node.Path, err)
+
+			return false
+		}
+
+		return true
+	}, &ZkNodeContext{})
+
+	return nil
+}
+
+func (t *ZkLiveTree) mergeNode(node *ZkNode) error {
+	if stat, err := t.client.CheckExists().ForPath(node.Path); err != nil {
+		return err
+	} else if stat != nil {
+		if stat, err := t.client.SetData().WithVersion(stat.Version).ForPathWithData(node.Path, []byte(node.Value)); err != nil {
+			return err
+		} else {
+			log.Printf("merged node @ `%s` to version %d", node.Path, stat.Version)
+		}
+	} else {
+		if path, err := t.client.Create().CreatingParentsIfNeeded().ForPathWithData(node.Path, []byte(node.Value)); err != nil {
+			return err
+		} else {
+			log.Printf("created node @ `%s`", path)
+		}
+	}
+
 	return nil
 }
 

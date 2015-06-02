@@ -107,7 +107,7 @@ func main() {
 
 		if opts.debug {
 			log.SetOutput(os.Stderr)
-		} else if f, err := os.OpenFile(os.Args[0]+".log", os.O_CREATE|os.O_APPEND, 0644); err != nil {
+		} else if f, err := os.OpenFile(os.Args[0]+".log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644); err != nil {
 			log.SetOutput(os.Stderr)
 			log.Fatalf("fail to open log file, %s", err)
 		} else {
@@ -122,7 +122,7 @@ func main() {
 				log.Fatalf("fail to connect %s, %s", opts.zkHosts, err)
 			} else if loadedTree, err := LoadZkTree(opts.xmlFile); err != nil {
 				log.Fatalf("fail to load from %s, %s", opts.xmlFile, err)
-			} else if err := liveTree.Write(loadedTree, opts.force); err != nil {
+			} else if err := liveTree.Merge(loadedTree, opts.force); err != nil {
 				log.Fatalf("fail to write to %s, %s", opts.znodePath, err)
 			} else {
 				log.Printf("import %d nodes from XML file `%s` successful!", loadedTree.Root().Len(), opts.xmlFile)
