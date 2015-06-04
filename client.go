@@ -196,6 +196,10 @@ func (c *curatorZookeeperClient) Conn() (ZookeeperConnection, error) {
 	return c.state.Conn()
 }
 
+func (c *curatorZookeeperClient) InstanceIndex() int64 {
+	return c.state.InstanceIndex()
+}
+
 func (c *curatorZookeeperClient) BlockUntilConnectedOrTimedOut() error {
 	if !c.started.Load() {
 		return errors.New("Client is not started")

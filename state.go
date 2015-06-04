@@ -20,6 +20,7 @@ var (
 
 type zookeeperHelper interface {
 	GetConnectionString() string
+
 	GetZookeeperConnection() (ZookeeperConnection, error)
 }
 

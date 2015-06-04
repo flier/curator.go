@@ -332,9 +332,66 @@ func (c *curatorFramework) UnhandledErrorListenable() UnhandledErrorListenable {
 
 func (c *curatorFramework) processEvent(event CuratorEvent) {
 	if event.Type() == WATCHED {
-
+		c.validateConnection(event.WatchedEvent().State)
 	}
 
+	c.listeners.ForEach(func(l interface{}) {
+		tracer := c.client.StartTracer("EventListener")
+
+		defer tracer.Commit()
+
+		if err := l.(CuratorListener).EventReceived(c, event); err != nil {
+			c.logError(fmt.Errorf("Event listener threw exception, %s", err))
+		}
+	})
+}
+
+func (c *curatorFramework) validateConnection(state zk.State) {
+	switch state {
+	case zk.StateDisconnected:
+		c.suspendConnection()
+
+	case zk.StateExpired:
+		c.stateManager.AddStateChange(LOST)
+
+	case zk.StateSyncConnected:
+		c.stateManager.AddStateChange(RECONNECTED)
+
+	case zk.StateConnectedReadOnly:
+		c.stateManager.AddStateChange(READ_ONLY)
+	}
+}
+
+func (c *curatorFramework) suspendConnection() {
+	if !c.stateManager.SetToSuspended() {
+		return
+	}
+
+	go c.doSyncForSuspendedConnection(c.client.InstanceIndex())
+}
+
+func (c *curatorFramework) doSyncForSuspendedConnection(instanceIndex int64) {
+	tracer := c.client.StartTracer("BackgroundSyncImpl")
+
+	defer tracer.Commit()
+
+	if conn, err := c.client.Conn(); err == nil {
+		if path, err := conn.Sync("/"); err == nil {
+			c.processEvent(&curatorEvent{
+				eventType: SYNC,
+				err:       err,
+				path:      path,
+			})
+
+			return
+		}
+	}
+
+	if instanceIndex < 0 || instanceIndex == c.client.InstanceIndex() {
+		c.stateManager.AddStateChange(LOST)
+	} else {
+		go c.doSyncForSuspendedConnection(-1)
+	}
 }
 
 func (c *curatorFramework) logError(err error) {
