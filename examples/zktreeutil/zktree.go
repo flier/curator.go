@@ -15,6 +15,7 @@ import (
 
 	"github.com/flier/curator.go"
 	"github.com/pmezard/go-difflib/difflib"
+	"github.com/samuel/go-zookeeper/zk"
 )
 
 // The action type; any of create/delete/setvalue.
@@ -104,11 +105,9 @@ type ZkNode struct {
 }
 
 type ZkNodeUpdate struct {
-	XMLName xml.Name `xml:"update"`
-	Path    string   `xml:"path"`
-	Action  string   `xml:"action"`
-	Name    string   `xml:"name,attr,omitempty"`
-	Value   string   `xml:"value,attr,omitempty"`
+	XMLName xml.Name
+	Path    string `xml:"path,attr"`
+	Value   string `xml:"value,omitempty"`
 }
 
 type ZkNodeContext struct {
@@ -158,6 +157,7 @@ type ZkRootNode struct {
 }
 
 func (n *ZkRootNode) Visit(visitor ZkNodeVisitFunc, ctxt *ZkNodeContext) {
+
 	for i, child := range n.Children {
 		last := i == len(n.Children)-1
 
@@ -394,6 +394,8 @@ func (t *ZkLiveTree) Sync(r io.Reader, w io.Writer) error {
 		}
 	}()
 
+	nodes := make(map[string]*zk.Stat)
+
 	go func() {
 		encoder := xml.NewEncoder(w)
 
@@ -411,12 +413,35 @@ func (t *ZkLiveTree) Sync(r io.Reader, w io.Writer) error {
 					return true
 				}
 
-				if err := encoder.Encode(ZkNodeUpdate{
-					Path:   node.Path,
-					Action: "create",
-					Name:   node.Name,
-					Value:  node.Value,
-				}); err != nil {
+				update := ZkNodeUpdate{
+					XMLName: xml.Name{Local: "create"},
+					Path:    node.Path,
+					Value:   node.Value,
+				}
+
+				var stat zk.Stat
+
+				if data, err := t.client.GetData().StoringStatIn(&stat).Watched().ForPath(node.Path); err != nil {
+					errors <- fmt.Errorf("fail to monitor node data @ `%s`, %s", node.Path, err)
+
+					return false
+				} else {
+					log.Printf("monitoring node data @ %s", node.Path)
+
+					update.Value = string(data)
+				}
+
+				if _, err := t.client.GetChildren().Watched().ForPath(node.Path); err != nil {
+					errors <- fmt.Errorf("fail to monitor node children @ `%s`, %s", node.Path, err)
+
+					return false
+				} else {
+					log.Printf("monitoring node children @ %s", node.Path)
+				}
+
+				nodes[node.Path] = &stat
+
+				if err := encoder.Encode(update); err != nil {
 					errors <- fmt.Errorf("fail to encode node @ `%s`, %s", node.Path, err)
 
 					return false
@@ -426,19 +451,95 @@ func (t *ZkLiveTree) Sync(r io.Reader, w io.Writer) error {
 			}, &ZkNodeContext{})
 
 			t.client.CuratorListenable().AddListener(curator.NewCuratorListener(func(client curator.CuratorFramework, event curator.CuratorEvent) error {
-				update := ZkNodeUpdate{
-					Path:  event.Path(),
-					Name:  event.Name(),
-					Value: string(event.Data()),
-				}
+				if event.Type() == curator.WATCHED {
+					log.Printf("received %s event, type %s @ %s", event.Type(), event.WatchedEvent().Type, event.Path())
 
-				switch event.Type() {
-				case curator.CREATE:
-					update.Action = "create"
-				case curator.SET_DATA:
-					update.Action = "set_data"
-				case curator.DELETE:
-					update.Action = "delete"
+					update := ZkNodeUpdate{
+						Path:  event.Path(),
+						Value: string(event.Data()),
+					}
+
+					eventType := event.WatchedEvent().Type
+
+					switch eventType {
+					case curator.EventNodeDeleted:
+						update.XMLName.Local = "delete"
+
+						delete(nodes, event.Path())
+
+					case curator.EventNodeDataChanged:
+						update.XMLName.Local = "set_data"
+
+						if data, err := t.client.GetData().Watched().ForPath(event.Path()); err != nil {
+							errors <- fmt.Errorf("fail to monitor node data @ `%s`, %s", event.Path(), err)
+
+							return err
+						} else {
+							//log.Printf("monitoring node data @ %s", event.Path())
+
+							update.Value = string(data)
+						}
+
+					case curator.EventNodeChildrenChanged:
+						if children, err := t.client.GetChildren().Watched().ForPath(event.Path()); err != nil {
+							errors <- fmt.Errorf("fail to monitor node children @ `%s`, %s", event.Path(), err)
+
+							return err
+						} else {
+							log.Printf("monitoring node children @ %s", event.Path())
+
+							for _, child := range children {
+								childPath := path.Join(event.Path(), child)
+
+								if _, exists := nodes[childPath]; !exists {
+									var stat zk.Stat
+
+									if data, err := t.client.GetData().StoringStatIn(&stat).Watched().ForPath(childPath); err != nil {
+										errors <- fmt.Errorf("fail to monitor node data @ `%s`, %s", childPath, err)
+
+										return err
+									} else {
+										//log.Printf("monitoring node data @ %s", childPath)
+
+										if err := encoder.Encode(ZkNodeUpdate{
+											XMLName: xml.Name{Local: "create"},
+											Path:    childPath,
+											Value:   string(data),
+										}); err != nil {
+											errors <- fmt.Errorf("fail to encode node @ `%s`, %s", event.Path(), err)
+
+											return err
+										}
+									}
+
+									if _, err := t.client.GetChildren().Watched().ForPath(childPath); err != nil {
+										errors <- fmt.Errorf("fail to monitor node children @ `%s`, %s", childPath, err)
+
+										return err
+									} else {
+										//log.Printf("monitoring node children @ %s", childPath)
+									}
+
+									nodes[childPath] = &stat
+								} else {
+									//log.Printf("skip monitoring node @ %s", childPath)
+								}
+							}
+						}
+
+						return nil
+
+					default:
+						update.XMLName.Local = fmt.Sprintf("%s", eventType)
+					}
+
+					if err := encoder.Encode(update); err != nil {
+						errors <- fmt.Errorf("fail to encode node @ `%s`, %s", event.Path(), err)
+
+						return err
+					}
+				} else {
+					log.Printf("ignore event %v", event)
 				}
 
 				return nil
@@ -452,7 +553,7 @@ func (t *ZkLiveTree) Sync(r io.Reader, w io.Writer) error {
 			return err
 
 		case update := <-updates:
-			switch update.Action {
+			switch update.XMLName.Local {
 			case "create":
 				log.Printf("created node @ `%s` with %d bytes data", update.Path, len(update.Value))
 
