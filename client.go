@@ -95,6 +95,9 @@ type CuratorZookeeperClient interface {
 	// Return the managed ZK connection.
 	Conn() (ZookeeperConnection, error)
 
+	// Return the current retry policy
+	RetryPolicy() RetryPolicy
+
 	// Return a new retry loop. All operations should be performed in a retry loop
 	NewRetryLoop() RetryLoop
 
@@ -178,6 +181,10 @@ func (c *curatorZookeeperClient) Connected() bool {
 
 func (c *curatorZookeeperClient) CurrentConnectionString() string {
 	return c.state.ensembleProvider.ConnectionString()
+}
+
+func (c *curatorZookeeperClient) RetryPolicy() RetryPolicy {
+	return c.retryPolicy
 }
 
 func (c *curatorZookeeperClient) NewRetryLoop() RetryLoop {

@@ -258,9 +258,11 @@ func NewPathChildrenCache(client curator.CuratorFramework, path string, cacheDat
 	c.connectionStateListener = curator.NewConnectionStateListener(func(client curator.CuratorFramework, newState curator.ConnectionState) {
 		if newState.Connected() {
 			if c.isConnected.CompareAndSwap(false, true) {
-				if err := c.reset(); err != nil {
-					panic(fmt.Errorf("Trying to reset after reconnection, %s", err))
-				}
+				/*
+					if err := c.reset(); err != nil {
+						panic(fmt.Errorf("Trying to reset after reconnection, %s", err))
+					}
+				*/
 			}
 		} else {
 			c.isConnected.Set(false)
@@ -272,10 +274,11 @@ func NewPathChildrenCache(client curator.CuratorFramework, path string, cacheDat
 
 func (c *PathChildrenCache) RefreshMode(mode RefreshMode) {
 	c.ensurePath.Ensure(c.client.ZookeeperClient())
+	/*
+		c.client.GetChildren().UsingWatcher(c.childrenWatcher).InBackground(func(client CuratorFramework, event CuratorEvent) error {
+			if c.state.Value() == STOPPED {
 
-	c.client.GetChildren().UsingWatcher(c.childrenWatcher).InBackground(func(client CuratorFramework, event CuratorEvent) error {
-		if c.state.Value() == STOPPED {
-
-		}
-	}).ForPath(c.path)
+			}
+		}).ForPath(c.path)
+	*/
 }

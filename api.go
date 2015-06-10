@@ -22,6 +22,13 @@ var (
 	ErrSessionMoved            = zk.ErrSessionMoved
 )
 
+var (
+	EventNodeCreated         = zk.EventNodeCreated
+	EventNodeDeleted         = zk.EventNodeDeleted
+	EventNodeDataChanged     = zk.EventNodeDataChanged
+	EventNodeChildrenChanged = zk.EventNodeChildrenChanged
+)
+
 const AnyVersion int32 = -1
 
 type CreateMode int32

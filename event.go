@@ -1,6 +1,8 @@
 package curator
 
 import (
+	"fmt"
+
 	"github.com/samuel/go-zookeeper/zk"
 )
 
@@ -19,6 +21,16 @@ const (
 	WATCHED                          // Watchable.UsingWatcher() -> WatchedEvent()
 	CLOSING                          // Event sent when client is being closed
 )
+
+var CuratorEventTypeNames = []string{"CREATE", "DELETE", "EXISTS", "GET_DATA", "SET_DATA", "CHILDREN", "SYNC", "GET_ACL", "SET_ACL", "WATCHED", "CLOSING"}
+
+func (t CuratorEventType) String() string {
+	if int(t) < len(CuratorEventTypeNames) {
+		return CuratorEventTypeNames[int(t)]
+	}
+
+	return fmt.Sprintf("Type #%d", int(t))
+}
 
 // A super set of all the various Zookeeper events/background methods.
 type CuratorEvent interface {

@@ -470,6 +470,16 @@ func (c *mockCuratorZookeeperClient) Conn() (ZookeeperConnection, error) {
 	return conn, err
 }
 
+func (c *mockCuratorZookeeperClient) RetryPolicy() RetryPolicy {
+	retryPolicy := c.Called().Get(0).(RetryPolicy)
+
+	if c.log != nil {
+		c.log("CuratorZookeeperClient.RetryPolicy() retryPolicy=%v", retryPolicy)
+	}
+
+	return retryPolicy
+}
+
 func (c *mockCuratorZookeeperClient) NewRetryLoop() RetryLoop {
 	retryLoop, _ := c.Called().Get(0).(RetryLoop)
 

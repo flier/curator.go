@@ -127,6 +127,10 @@ type CuratorFrameworkBuilder struct {
 
 // Apply the current values and build a new CuratorFramework
 func (b *CuratorFrameworkBuilder) Build() CuratorFramework {
+	if b.EnsembleProvider == nil {
+		panic("missed ensemble provider")
+	}
+
 	builder := *b
 
 	if builder.SessionTimeout == 0 {

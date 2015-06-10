@@ -8,6 +8,7 @@ import (
 	"github.com/samuel/go-zookeeper/zk"
 )
 
+// Debugging stats about operations
 type AtomicStats struct {
 	//  the number of optimistic locks used to perform the operation
 	OptimisticTries int
@@ -36,7 +37,7 @@ type AtomicValue interface {
 	PostValue() []byte
 
 	// Returns debugging stats about the operation
-	Stat() *AtomicStats
+	Stats() *AtomicStats
 }
 
 type DistributedAtomicValue interface {
@@ -91,7 +92,7 @@ func (v *mutableAtomicValue) PreValue() []byte { return v.preValue }
 
 func (v *mutableAtomicValue) PostValue() []byte { return v.postValue }
 
-func (v *mutableAtomicValue) Stat() *AtomicStats { return &v.stats }
+func (v *mutableAtomicValue) Stats() *AtomicStats { return &v.stats }
 
 type PromotedToLock struct {
 	lockPath    string

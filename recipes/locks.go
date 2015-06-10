@@ -53,7 +53,7 @@ type LockInternalsDriver interface {
 
 	GetsTheLock(client curator.CuratorFramework, children []string, sequenceNodeName string, maxLeases int) (*PredicateResults, error)
 
-	createsTheLock(client curator.CuratorFramework, path string, lockNodeBytes []byte) (string, error)
+	CreatesTheLock(client curator.CuratorFramework, path string, lockNodeBytes []byte) (string, error)
 }
 
 type StandardLockInternalsDriver struct{}
@@ -83,7 +83,7 @@ func (d *StandardLockInternalsDriver) GetsTheLock(client curator.CuratorFramewor
 
 			getsTheLock := i < maxLeases
 
-			if getsTheLock {
+			if !getsTheLock {
 				pathToWatch = children[i-maxLeases]
 			}
 
@@ -91,10 +91,10 @@ func (d *StandardLockInternalsDriver) GetsTheLock(client curator.CuratorFramewor
 		}
 	}
 
-	return nil, fmt.Errorf("Sequential path not found: %s", sequenceNodeName)
+	return nil, zk.ErrNoNode
 }
 
-func (d *StandardLockInternalsDriver) createsTheLock(client curator.CuratorFramework, path string, lockNodeBytes []byte) (string, error) {
+func (d *StandardLockInternalsDriver) CreatesTheLock(client curator.CuratorFramework, path string, lockNodeBytes []byte) (string, error) {
 	if lockNodeBytes == nil {
 		return client.Create().CreatingParentsIfNeeded().WithMode(curator.EPHEMERAL_SEQUENTIAL).ForPath(path)
 	} else {
@@ -212,7 +212,7 @@ func (l *lockInternals) attemptLock(waitTime time.Duration, lockNodeBytes []byte
 		var ourPath string
 		var err error
 
-		if ourPath, err = l.driver.createsTheLock(l.client, l.lockPath, lockNodeBytes); err == nil {
+		if ourPath, err = l.driver.CreatesTheLock(l.client, l.lockPath, lockNodeBytes); err == nil {
 			if hasTheLock, err := l.internalLockLoop(startTime, waitTime, ourPath); err == nil {
 				if hasTheLock {
 					return ourPath, nil
@@ -225,7 +225,7 @@ func (l *lockInternals) attemptLock(waitTime time.Duration, lockNodeBytes []byte
 		if err == zk.ErrNoNode {
 			retryCount++
 
-			if l.client.ZookeeperClient().RetryPolicy.AllowRetry(retryCount, time.Now().Sub(startTime), curator.DefaultRetrySleeper) {
+			if l.client.ZookeeperClient().RetryPolicy().AllowRetry(retryCount, time.Now().Sub(startTime), curator.DefaultRetrySleeper) {
 				continue
 			}
 		}
