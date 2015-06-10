@@ -114,6 +114,32 @@ func TestLockInternalsDriver(t *testing.T) {
 	})
 }
 
+func TestLockInternals(t *testing.T) {
+	Convey("Given lockInternals", t, func() {
+		mocks := newMockBuilder(t)
+
+		client := mocks.Build()
+
+		So(client.Start(), ShouldBeNil)
+
+		Convey("base on invalidated path", func() {
+			internal, err := newLockInternals(client, mocks.driver, "invalid", LockPrefix, 3)
+
+			So(internal, ShouldBeNil)
+			So(err, ShouldNotBeNil)
+		})
+
+		Convey("base on a validated path", func() {
+			internal, err := newLockInternals(client, mocks.driver, "/path", LockPrefix, 3)
+
+			So(internal, ShouldNotBeNil)
+			So(err, ShouldBeNil)
+		})
+
+		mocks.Check(t)
+	})
+}
+
 func TestInterProcessMutex(t *testing.T) {
 	Convey("Given an InterProcessMutex base on a path", t, func() {
 

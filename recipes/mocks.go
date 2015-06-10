@@ -236,11 +236,73 @@ func (d *mockZookeeperDialer) Dial(connString string, sessionTimeout time.Durati
 	return conn, events, err
 }
 
+type mockRetryPolicy struct {
+	mock.Mock
+
+	log logFunc
+}
+
+func (r *mockRetryPolicy) AllowRetry(retryCount int, elapsedTime time.Duration, sleeper curator.RetrySleeper) bool {
+	args := r.Called(retryCount, elapsedTime, sleeper)
+
+	allow := args.Bool(0)
+
+	if r.log != nil {
+		r.log("RetryPolicy.AllowRetry(retryCount=%d, elapsedTime=%v, sleeper=%p) allow=%v", retryCount, elapsedTime, sleeper, allow)
+	}
+
+	return allow
+}
+
+type mockLockInternalsDriver struct {
+	mock.Mock
+
+	log logFunc
+}
+
+func (d *mockLockInternalsDriver) FixForSorting(str, lockName string) string {
+	suffix := d.Called(str, lockName).String(0)
+
+	if d.log != nil {
+		d.log("LockInternalsDriver.FixForSorting(str=\"%s\", lockName=\"%s\") path=\"%s\"", str, lockName, suffix)
+	}
+
+	return suffix
+}
+
+func (d *mockLockInternalsDriver) GetsTheLock(client curator.CuratorFramework, children []string, sequenceNodeName string, maxLeases int) (*PredicateResults, error) {
+	args := d.Called(client, children, sequenceNodeName, maxLeases)
+
+	ret, _ := args.Get(0).(*PredicateResults)
+	err := args.Error(1)
+
+	if d.log != nil {
+		d.log("LockInternalsDriver.FixForSorting(client=%p, children=%v, sequenceNodeName=\"%s\", maxLeases=%d) (results=%v, err=%v)", client, children, sequenceNodeName, maxLeases, ret, err)
+	}
+
+	return ret, err
+}
+
+func (d *mockLockInternalsDriver) CreatesTheLock(client curator.CuratorFramework, path string, lockNodeBytes []byte) (string, error) {
+	args := d.Called(client, path, lockNodeBytes)
+
+	str := args.String(0)
+	err := args.Error(1)
+
+	if d.log != nil {
+		d.log("LockInternalsDriver.FixForSorting(client=%p, path=\"%s\", lockNodeBytes=%v) (path=%s, err=%v)", client, path, lockNodeBytes, str, err)
+	}
+
+	return str, err
+}
+
 type mockBuilder struct {
-	conn    *mockZookeeperConnection
-	events  chan zk.Event
-	dialer  *mockZookeeperDialer
-	builder *curator.CuratorFrameworkBuilder
+	conn        *mockZookeeperConnection
+	events      chan zk.Event
+	dialer      *mockZookeeperDialer
+	builder     *curator.CuratorFrameworkBuilder
+	retryPolicy *mockRetryPolicy
+	driver      *mockLockInternalsDriver
 }
 
 func newMockBuilder(t *testing.T) *mockBuilder {
@@ -250,10 +312,12 @@ func newMockBuilder(t *testing.T) *mockBuilder {
 	builder := &curator.CuratorFrameworkBuilder{ZookeeperDialer: dialer}
 
 	return &mockBuilder{
-		conn:    conn,
-		events:  make(chan zk.Event),
-		dialer:  dialer,
-		builder: builder,
+		conn:        conn,
+		events:      make(chan zk.Event),
+		dialer:      dialer,
+		builder:     builder,
+		retryPolicy: &mockRetryPolicy{log: t.Logf},
+		driver:      &mockLockInternalsDriver{log: t.Logf},
 	}
 }
 
@@ -268,4 +332,6 @@ func (b *mockBuilder) Build() curator.CuratorFramework {
 func (b *mockBuilder) Check(t *testing.T) {
 	b.conn.AssertExpectations(t)
 	b.dialer.AssertExpectations(t)
+	b.retryPolicy.AssertExpectations(t)
+	b.driver.AssertExpectations(t)
 }

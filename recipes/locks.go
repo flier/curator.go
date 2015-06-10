@@ -11,6 +11,8 @@ import (
 	"github.com/samuel/go-zookeeper/zk"
 )
 
+const LockPrefix = "lock-"
+
 type InterProcessLock interface {
 	// Acquire the mutex - blocking until it's available.
 	// Each call to acquire must be balanced by a call to Release()
@@ -122,10 +124,14 @@ func NewInterProcessMutexWithDriver(client curator.CuratorFramework, path string
 		return nil, err
 	}
 
-	return &InterProcessMutex{
-		basePath:  path,
-		internals: newLockInternals(client, driver, path, "lock-", 1),
-	}, nil
+	if internals, err := newLockInternals(client, driver, path, LockPrefix, 1); err != nil {
+		return nil, err
+	} else {
+		return &InterProcessMutex{
+			basePath:  path,
+			internals: internals,
+		}, nil
+	}
 }
 
 func (m *InterProcessMutex) Acquire() (bool, error) {
@@ -193,15 +199,19 @@ type lockInternals struct {
 	maxLeases int
 }
 
-func newLockInternals(client curator.CuratorFramework, driver LockInternalsDriver, path, lockName string, maxLeases int) *lockInternals {
+func newLockInternals(client curator.CuratorFramework, driver LockInternalsDriver, basePath, lockName string, maxLeases int) (*lockInternals, error) {
+	if err := curator.ValidatePath(basePath); err != nil {
+		return nil, err
+	}
+
 	return &lockInternals{
 		client:    client,
 		driver:    driver,
-		basePath:  path,
+		basePath:  basePath,
 		lockName:  lockName,
-		lockPath:  curator.JoinPath(path, lockName),
+		lockPath:  curator.JoinPath(basePath, lockName),
 		maxLeases: maxLeases,
-	}
+	}, nil
 }
 
 func (l *lockInternals) attemptLock(waitTime time.Duration, lockNodeBytes []byte) (string, error) {
